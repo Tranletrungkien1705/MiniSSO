@@ -1,0 +1,31 @@
+@model List<MiniSSO.Domain.Client>
+@{ ViewData["Title"] = "Ứng dụng (Client)"; }
+<div class="row g-3">
+    <div class="col-lg-5"><div class="card"><div class="card-body">
+        <h6 class="fw-bold mb-3">Đăng ký client</h6>
+        <form asp-action="Create" method="post">@Html.AntiForgeryToken()
+            <div class="mb-2"><input name="clientId" class="form-control" placeholder="Client ID *" required /></div>
+            <div class="mb-2"><input name="name" class="form-control" placeholder="Tên ứng dụng" /></div>
+            <div class="mb-2"><input name="redirectUris" class="form-control" placeholder="Redirect URIs (csv)" /></div>
+            <div class="mb-2"><input name="grants" class="form-control" placeholder="Grants" value="authorization_code,refresh_token" /></div>
+            <div class="mb-2"><input name="scopes" class="form-control" placeholder="Scopes" value="openid,profile,email,roles" /></div>
+            <div class="mb-2"><input name="secret" class="form-control" placeholder="Client secret (trống = public/PKCE)" /></div>
+            <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="requirePkce" value="true" id="pk" checked /><label class="form-check-label small" for="pk">Bắt buộc PKCE</label></div>
+            <button class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i>Đăng ký</button>
+        </form>
+    </div></div></div>
+    <div class="col-lg-7"><div class="card"><div class="card-body">
+        <table class="table table-hover align-middle"><thead><tr><th>Client ID</th><th>Tên / Grants</th><th>Loại</th><th>TT</th><th></th></tr></thead><tbody>
+        @foreach (var c in Model)
+        {
+            <tr>
+                <td class="fw-semibold"><code>@c.ClientId</code></td>
+                <td><div>@c.Name</div><div class="small text-muted">@c.AllowedGrants</div></td>
+                <td>@if (c.ClientSecretHash == null) { <span class="badge bg-info">public+PKCE</span> } else { <span class="badge bg-warning text-dark">confidential</span> }</td>
+                <td>@if (c.IsActive) { <span class="badge bg-success">bật</span> } else { <span class="badge bg-secondary">tắt</span> }</td>
+                <td><form asp-action="Toggle" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@c.Id" /><button class="btn btn-sm btn-outline-secondary">@(c.IsActive ? "Tắt" : "Bật")</button></form></td>
+            </tr>
+        }
+        </tbody></table>
+    </div></div></div>
+</div>

@@ -1,0 +1,50 @@
+@{
+    Layout = null;
+    ViewData["Title"] = "Cấp quyền";
+    var client = (MiniSSO.Domain.Client)ViewBag.Client;
+    var scope = (string)ViewBag.Scope;
+    var p = ViewBag.Params;
+    var scopes = scope.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+    string ScopeText(string s) => s switch { "openid" => "Định danh của bạn", "profile" => "Thông tin hồ sơ (tên)", "email" => "Địa chỉ email", "roles" => "Vai trò/quyền", "api" => "Gọi API thay bạn", _ => s };
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Cấp quyền — MiniSSO</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  body { background: radial-gradient(900px 500px at 50% -10%, rgba(99,102,241,.25), transparent 60%), #0b1020;
+    min-height:100vh; display:flex; align-items:center; justify-content:center; font-family:"Be Vietnam Pro",sans-serif; }
+  .box { background:#fff; border-radius:16px; padding:32px; width:420px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="text-center mb-3"><i class="bi bi-shield-check" style="font-size:40px;color:#6366f1"></i></div>
+  <h5 class="fw-bold text-center mb-1">@client.Name</h5>
+  <p class="text-muted text-center small mb-4">muốn truy cập tài khoản <b>@(User.FindFirst("email")?.Value)</b></p>
+  <div class="mb-4">
+    <div class="small text-muted mb-2">Ứng dụng sẽ được phép:</div>
+    @foreach (var s in scopes)
+    { <div class="d-flex align-items-center mb-1"><i class="bi bi-check-circle-fill text-success me-2"></i>@ScopeText(s)</div> }
+  </div>
+  <form method="post" action="/oauth/authorize">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="client_id" value="@p.client_id" />
+    <input type="hidden" name="redirect_uri" value="@p.redirect_uri" />
+    <input type="hidden" name="scope" value="@scope" />
+    <input type="hidden" name="state" value="@p.state" />
+    <input type="hidden" name="code_challenge" value="@p.code_challenge" />
+    <input type="hidden" name="code_challenge_method" value="@p.code_challenge_method" />
+    <div class="d-flex gap-2">
+      <button name="decision" value="deny" class="btn btn-outline-secondary w-50">Từ chối</button>
+      <button name="decision" value="allow" class="btn btn-primary w-50" style="background:#6366f1;border:none">Cho phép</button>
+    </div>
+  </form>
+  <div class="text-center text-muted mt-3" style="font-size:11px">Chuyển hướng tới: @p.redirect_uri</div>
+</div>
+</body>
+</html>

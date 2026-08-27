@@ -1,0 +1,32 @@
+@model List<AppUser>
+@{ ViewData["Title"] = "Người dùng"; }
+<div class="row g-3">
+    <div class="col-lg-4"><div class="card"><div class="card-body">
+        <h6 class="fw-bold mb-3">Thêm người dùng</h6>
+        <form asp-action="Create" method="post">@Html.AntiForgeryToken()
+            <div class="mb-2"><input name="email" type="email" class="form-control" placeholder="Email *" required /></div>
+            <div class="mb-2"><input name="fullName" class="form-control" placeholder="Họ tên" /></div>
+            <div class="mb-2"><input name="password" type="text" class="form-control" placeholder="Mật khẩu *" required /></div>
+            <div class="row g-2 mb-3">
+                <div class="col-6"><input name="roles" class="form-control" placeholder="Vai trò (csv)" /></div>
+                <div class="col-6"><input name="tenant" class="form-control" placeholder="Tổ chức" /></div>
+            </div>
+            <button class="btn btn-primary w-100"><i class="bi bi-person-plus me-1"></i>Tạo</button>
+        </form>
+        <p class="text-muted small mt-3 mb-0">Mật khẩu băm PBKDF2-SHA256 (100k vòng).</p>
+    </div></div></div>
+    <div class="col-lg-8"><div class="card"><div class="card-body">
+        <table class="table table-hover align-middle"><thead><tr><th>Email</th><th>Họ tên</th><th>Vai trò</th><th>Tổ chức</th><th>TT</th><th></th></tr></thead><tbody>
+        @foreach (var u in Model)
+        {
+            <tr>
+                <td class="fw-semibold">@u.Email</td><td>@u.FullName</td>
+                <td>@foreach (var r in u.RoleList) { <span class="badge bg-light text-dark me-1">@r</span> }</td>
+                <td class="small text-muted">@u.Tenant</td>
+                <td>@if (u.IsActive) { <span class="badge bg-success">bật</span> } else { <span class="badge bg-secondary">khóa</span> }</td>
+                <td><form asp-action="Toggle" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@u.Id" /><button class="btn btn-sm btn-outline-secondary">@(u.IsActive ? "Khóa" : "Mở")</button></form></td>
+            </tr>
+        }
+        </tbody></table>
+    </div></div></div>
+</div>

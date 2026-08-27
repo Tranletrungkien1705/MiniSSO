@@ -1,0 +1,21 @@
+@{ ViewData["Title"] = "Bảng điều khiển"; var iss = (string)ViewBag.Issuer; }
+<div class="row g-3 mb-3">
+    <div class="col-6 col-lg-4"><div class="card"><div class="card-body"><div class="text-muted small">Người dùng</div><div class="stat-num">@ViewBag.Users</div></div></div></div>
+    <div class="col-6 col-lg-4"><div class="card"><div class="card-body"><div class="text-muted small">Ứng dụng (client)</div><div class="stat-num">@ViewBag.Clients</div></div></div></div>
+    <div class="col-6 col-lg-4"><div class="card"><div class="card-body"><div class="text-muted small">Refresh token đang dùng</div><div class="stat-num">@ViewBag.Tokens</div></div></div></div>
+</div>
+<div class="card"><div class="card-body">
+    <h6 class="fw-bold mb-3">Máy chủ định danh (OpenID Connect)</h6>
+    <p class="text-muted small mb-3">MiniSSO thay iNOS: cấp JWT ký RSA-256, xác thực tập trung cho cả fleet. Các endpoint chuẩn OIDC:</p>
+    <div class="row g-2 small">
+        <div class="col-md-6"><div class="border rounded p-2"><b>Discovery</b><br /><code>GET @iss/.well-known/openid-configuration</code></div></div>
+        <div class="col-md-6"><div class="border rounded p-2"><b>JWKS (khóa công khai)</b><br /><code>GET @iss/.well-known/jwks.json</code></div></div>
+        <div class="col-md-6"><div class="border rounded p-2"><b>Token</b><br /><code>POST @iss/oauth/token</code></div></div>
+        <div class="col-md-6"><div class="border rounded p-2"><b>UserInfo</b><br /><code>GET @iss/oauth/userinfo</code> (Bearer)</div></div>
+        <div class="col-12"><div class="border rounded p-2"><b>Authorize (code+PKCE)</b><br /><code>GET @iss/oauth/authorize?response_type=code&client_id=fleet-web&redirect_uri=...&scope=openid&code_challenge=...&code_challenge_method=S256</code></div></div>
+    </div>
+    <div class="mt-3 p-3 rounded" style="background:#f5f5fb">
+        <div class="fw-semibold mb-1 small">Thử nhanh (Resource Owner Password — cho tích hợp fleet):</div>
+        <pre class="mb-0 small" style="white-space:pre-wrap">curl -X POST @iss/oauth/token -d "grant_type=password&client_id=fleet-service&client_secret=service-secret-demo&username=admin@minisso.dev&password=Admin@123&scope=openid profile roles"</pre>
+    </div>
+</div></div>
