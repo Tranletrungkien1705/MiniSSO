@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MiniSSO.Data;
@@ -22,8 +23,15 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     .AddCookie(o => { o.LoginPath = "/Account/Login"; o.Cookie.Name = "minisso.sid"; });
 builder.Services.AddAuthorization();
 builder.Services.AddControllersWithViews();
+// Sau reverse-proxy (Render terminate TLS): tin X-Forwarded-Proto/Host để Request.Scheme=https → issuer đúng.
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    o.KnownNetworks.Clear(); o.KnownProxies.Clear();
+});
 
 var app = builder.Build();
+app.UseForwardedHeaders();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
