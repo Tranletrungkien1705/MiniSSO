@@ -13,7 +13,9 @@ public sealed class AuthService(AppDbContext db, TokenService tokens)
 {
     public async Task<AppUser?> ValidateUserAsync(string email, string password)
     {
-        var u = await db.Users.FirstOrDefaultAsync(x => x.Email == email && x.IsActive);
+        // Chuẩn hóa email: bỏ khoảng trắng 2 đầu + không phân biệt hoa/thường (tránh lỗi copy-paste).
+        var norm = (email ?? "").Trim().ToLowerInvariant();
+        var u = await db.Users.FirstOrDefaultAsync(x => x.Email.ToLower() == norm && x.IsActive);
         return u != null && PasswordHasher.Verify(password, u.PasswordHash) ? u : null;
     }
 
