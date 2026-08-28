@@ -5,8 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MiniSSO.Data;
 using MiniSSO.Services;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog();
 builder.WebHost.UseUrls($"http://0.0.0.0:{Environment.GetEnvironmentVariable("PORT") ?? "8080"}");
 
 var conn = Environment.GetEnvironmentVariable("CONNECTION_STRING")
@@ -22,6 +24,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(o => { o.LoginPath = "/Account/Login"; o.Cookie.Name = "minisso.sid"; });
 builder.Services.AddAuthorization();
+builder.Services.AddFleetObs();
 builder.Services.AddControllersWithViews();
 // Sau reverse-proxy (Render terminate TLS): tin X-Forwarded-Proto/Host để Request.Scheme=https → issuer đúng.
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
@@ -36,6 +39,8 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await Seeder.SeedAsync(db);
+
+app.UseFleetObs();
     await scope.ServiceProvider.GetRequiredService<SigningKeyStore>().EnsureLoadedAsync(db);
 }
 
