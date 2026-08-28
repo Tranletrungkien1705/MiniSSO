@@ -7,6 +7,7 @@ using MiniSSO.Data;
 using MiniSSO.Services;
 using Serilog;
 
+FleetObs.ConfigureLogger("minisso");
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
 builder.WebHost.UseUrls($"http://0.0.0.0:{Environment.GetEnvironmentVariable("PORT") ?? "8080"}");
