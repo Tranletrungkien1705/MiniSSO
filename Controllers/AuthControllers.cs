@@ -73,7 +73,13 @@ public class OAuthController(AuthService auth, AppDbContext db) : Controller
     }
 }
 
-public class HomeController(AppDbContext db) : Controller
+public class HomeController : Controller
+{
+    // SPA React (admin) ở "/". Login/authorize/consent + OAuth minimal-API endpoints giữ nguyên.
+    public IActionResult Index() => Redirect("/index.html");
+}
+
+public class LegacyController(AppDbContext db) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -81,6 +87,6 @@ public class HomeController(AppDbContext db) : Controller
         ViewBag.Clients = await db.Clients.CountAsync();
         ViewBag.Tokens = await db.RefreshTokens.CountAsync(t => !t.Revoked);
         ViewBag.Issuer = $"{Request.Scheme}://{Request.Host}";
-        return View();
+        return View("~/Views/Home/Index.cshtml");
     }
 }

@@ -4,3 +4,6 @@ obj/
 *.db-shm
 *.db-wal
 .vs/
+
+node_modules/
+clientapp/dist/

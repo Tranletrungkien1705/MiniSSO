@@ -6,6 +6,10 @@
     <RootNamespace>MiniSSO</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="MiniSSO.Tests/**/*.cs" />
+    <Content Remove="MiniSSO.Tests/**/*" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.10" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
