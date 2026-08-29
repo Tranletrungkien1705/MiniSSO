@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Serilog;
 using Serilog.Context;
+using Serilog.Events;
 using Serilog.Sinks.OpenSearch;
 using StackExchange.Redis;
 
@@ -57,7 +58,7 @@ public static class FleetObs
     public static void ConfigureLogger(string app)
     {
         var url = Environment.GetEnvironmentVariable("ELASTIC_URL");
-        var cfg = new LoggerConfiguration().Enrich.FromLogContext().Enrich.WithProperty("app", app)
+        var cfg = new LoggerConfiguration().MinimumLevel.Information().MinimumLevel.Override("Microsoft", LogEventLevel.Warning).MinimumLevel.Override("System", LogEventLevel.Warning).Enrich.FromLogContext().Enrich.WithProperty("app", app)
             .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] ({CorrelationId}) {Message:lj}{NewLine}{Exception}");
         if (!string.IsNullOrWhiteSpace(url))
             cfg = cfg.WriteTo.OpenSearch(new OpenSearchSinkOptions(new Uri(url))
@@ -70,5 +71,5 @@ public static class FleetObs
     public static void AddFleetObs(this IServiceCollection s)
     { s.AddSingleton<ICache, RedisCache>(); s.AddEndpointsApiExplorer(); s.AddSwaggerGen(); }
     public static void UseFleetObs(this WebApplication app)
-    { app.UseMiddleware<CorrelationMiddleware>(); app.UseSerilogRequestLogging(); app.UseSwagger(); app.UseSwaggerUI(c => c.RoutePrefix = "swagger"); }
+    { app.UseMiddleware<CorrelationMiddleware>(); app.UseSerilogRequestLogging(o => o.GetLevel = (ctx, _, ex) => ex != null || ctx.Response.StatusCode >= 500 ? LogEventLevel.Error : ctx.Request.Path.StartsWithSegments("/healthz") ? LogEventLevel.Verbose : LogEventLevel.Information); app.UseSwagger(); app.UseSwaggerUI(c => c.RoutePrefix = "swagger"); }
 }
