@@ -91,29 +91,32 @@ public class ApiV1Controller(AppDbContext db, ICache cache) : ControllerBase
     // Bản quyền: mỗi app fleet tự gọi endpoint này khi khởi động (công khai trong Program.cs) để xác thực license
     // key + tự ghi log lại "ai/ở đâu" đang chạy source code. Không xác thực JWT (app còn chưa có user đăng nhập lúc startup).
     [HttpPost("license/check")]
-    public async Task<IActionResult> LicenseCheck([FromBody] LicenseCheckReq r)
+    public async Task<IActionResult> LicenseCheck([FromBody] LicenseCheckReq request)
     {
-        var key = (r.LicenseKey ?? "").Trim();
-        var appSlug = (r.AppSlug ?? "").Trim().ToLowerInvariant();
-        var lic = string.IsNullOrWhiteSpace(key) ? null : await db.Licenses.FirstOrDefaultAsync(x => x.LicenseKey == key);
-        bool ok = lic != null && lic.IsActive && (lic.ExpiresAt == null || lic.ExpiresAt > DateTime.UtcNow);
-        var msg = lic == null ? "License key không tồn tại." : !lic.IsActive ? "License đã bị khoá." : lic.ExpiresAt <= DateTime.UtcNow ? "License đã hết hạn." : "OK.";
+        var licenseKey = (request.LicenseKey ?? "").Trim();
+        var appSlug = (request.AppSlug ?? "").Trim().ToLowerInvariant();
+        var license = string.IsNullOrWhiteSpace(licenseKey) ? null : await db.Licenses.FirstOrDefaultAsync(lic => lic.LicenseKey == licenseKey);
+        bool isValid = license != null && license.IsActive && (license.ExpiresAt == null || license.ExpiresAt > DateTime.UtcNow);
+        var resultMessage = license == null ? "License key không tồn tại."
+            : !license.IsActive ? "License đã bị khoá."
+            : license.ExpiresAt <= DateTime.UtcNow ? "License đã hết hạn."
+            : "OK.";
         db.LicenseCheckLogs.Add(new LicenseCheckLog
         {
-            LicenseKey = key, AppSlug = appSlug, InstanceHost = r.InstanceHost,
-            RemoteIp = HttpContext.Connection.RemoteIpAddress?.ToString(), Result = ok, Message = msg
+            LicenseKey = licenseKey, AppSlug = appSlug, InstanceHost = request.InstanceHost,
+            RemoteIp = HttpContext.Connection.RemoteIpAddress?.ToString(), Result = isValid, Message = resultMessage
         });
         await db.SaveChangesAsync();
-        return Ok(new { valid = ok, message = msg, owner = ok ? lic!.OwnerName : null });
+        return Ok(new { valid = isValid, message = resultMessage, owner = isValid ? license!.OwnerName : null });
     }
 
     [HttpGet("license/logs")]
     public async Task<IActionResult> LicenseLogs([FromQuery] string? appSlug, [FromQuery] int take = 100)
     {
-        var q = db.LicenseCheckLogs.OrderByDescending(x => x.CheckedAt).AsQueryable();
-        if (!string.IsNullOrWhiteSpace(appSlug)) q = q.Where(x => x.AppSlug == appSlug.Trim().ToLowerInvariant());
-        var rows = await q.Take(Math.Clamp(take, 1, 500)).ToListAsync();
-        return Ok(rows.Select(x => new { x.AppSlug, x.InstanceHost, x.RemoteIp, x.Result, x.Message, x.CheckedAt }));
+        var logsQuery = db.LicenseCheckLogs.OrderByDescending(log => log.CheckedAt).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(appSlug)) logsQuery = logsQuery.Where(log => log.AppSlug == appSlug.Trim().ToLowerInvariant());
+        var logs = await logsQuery.Take(Math.Clamp(take, 1, 500)).ToListAsync();
+        return Ok(logs.Select(log => new { log.AppSlug, log.InstanceHost, log.RemoteIp, log.Result, log.Message, log.CheckedAt }));
     }
 
     // Thông tin OIDC discovery (để SPA hiển thị hướng dẫn tích hợp).
