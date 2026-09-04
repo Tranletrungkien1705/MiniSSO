@@ -88,6 +88,34 @@ public class ApiV1Controller(AppDbContext db, ICache cache) : ControllerBase
         return Ok(new { ok = true, isActive = c.IsActive });
     }
 
+    // Bản quyền: mỗi app fleet tự gọi endpoint này khi khởi động (công khai trong Program.cs) để xác thực license
+    // key + tự ghi log lại "ai/ở đâu" đang chạy source code. Không xác thực JWT (app còn chưa có user đăng nhập lúc startup).
+    [HttpPost("license/check")]
+    public async Task<IActionResult> LicenseCheck([FromBody] LicenseCheckReq r)
+    {
+        var key = (r.LicenseKey ?? "").Trim();
+        var appSlug = (r.AppSlug ?? "").Trim().ToLowerInvariant();
+        var lic = string.IsNullOrWhiteSpace(key) ? null : await db.Licenses.FirstOrDefaultAsync(x => x.LicenseKey == key);
+        bool ok = lic != null && lic.IsActive && (lic.ExpiresAt == null || lic.ExpiresAt > DateTime.UtcNow);
+        var msg = lic == null ? "License key không tồn tại." : !lic.IsActive ? "License đã bị khoá." : lic.ExpiresAt <= DateTime.UtcNow ? "License đã hết hạn." : "OK.";
+        db.LicenseCheckLogs.Add(new LicenseCheckLog
+        {
+            LicenseKey = key, AppSlug = appSlug, InstanceHost = r.InstanceHost,
+            RemoteIp = HttpContext.Connection.RemoteIpAddress?.ToString(), Result = ok, Message = msg
+        });
+        await db.SaveChangesAsync();
+        return Ok(new { valid = ok, message = msg, owner = ok ? lic!.OwnerName : null });
+    }
+
+    [HttpGet("license/logs")]
+    public async Task<IActionResult> LicenseLogs([FromQuery] string? appSlug, [FromQuery] int take = 100)
+    {
+        var q = db.LicenseCheckLogs.OrderByDescending(x => x.CheckedAt).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(appSlug)) q = q.Where(x => x.AppSlug == appSlug.Trim().ToLowerInvariant());
+        var rows = await q.Take(Math.Clamp(take, 1, 500)).ToListAsync();
+        return Ok(rows.Select(x => new { x.AppSlug, x.InstanceHost, x.RemoteIp, x.Result, x.Message, x.CheckedAt }));
+    }
+
     // Thông tin OIDC discovery (để SPA hiển thị hướng dẫn tích hợp).
     [HttpGet("oidc-info")]
     public IActionResult OidcInfo()
@@ -105,3 +133,4 @@ public record DashDto(int Users, int ActiveUsers, int Clients, int ActiveTokens,
 
 public class UserReq { public string Email { get; set; } = ""; public string Password { get; set; } = ""; public string? FullName { get; set; } public string? Roles { get; set; } public string? Tenant { get; set; } }
 public class ClientReq { public string ClientId { get; set; } = ""; public string? Name { get; set; } public string? RedirectUris { get; set; } public string? Grants { get; set; } public string? Scopes { get; set; } public string? Secret { get; set; } public bool RequirePkce { get; set; } = true; }
+public class LicenseCheckReq { public string? LicenseKey { get; set; } public string? AppSlug { get; set; } public string? InstanceHost { get; set; } }

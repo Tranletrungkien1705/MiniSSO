@@ -71,3 +71,27 @@ public class SigningKey
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
 }
+
+/// <summary>Bản quyền phần mềm cấp cho 1 chủ sở hữu — mỗi app trong fleet tự gọi /api/v1/license/check khi khởi động (công khai trong Program.cs, không ẩn giấu) để xác thực + ghi log ai đang chạy.</summary>
+public class AppLicense
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string LicenseKey { get; set; } = "";
+    public string OwnerName { get; set; } = "";
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ExpiresAt { get; set; }
+}
+
+/// <summary>Lịch sử mỗi lần 1 instance app gọi về xác thực license — cho biết ai/ở đâu đang chạy source code.</summary>
+public class LicenseCheckLog
+{
+    public long Id { get; set; }
+    public string LicenseKey { get; set; } = "";
+    public string AppSlug { get; set; } = "";
+    public string? InstanceHost { get; set; }
+    public string? RemoteIp { get; set; }
+    public bool Result { get; set; }
+    public string? Message { get; set; }
+    public DateTime CheckedAt { get; set; } = DateTime.UtcNow;
+}
