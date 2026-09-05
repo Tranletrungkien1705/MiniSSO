@@ -62,6 +62,8 @@ public class OAuthController(AuthService auth, AppDbContext db) : Controller
         string? scope, string? state, string? code_challenge, string? code_challenge_method)
     {
         if (User.Identity?.IsAuthenticated != true) return RedirectToAction("Login", "Account");
+        var client = await auth.GetClientAsync(client_id);
+        if (client == null || !client.Redirects.Contains(redirect_uri)) return BadRequest(new { error = "invalid_redirect_uri" });
         var sep = redirect_uri.Contains('?') ? '&' : '?';
         if (decision != "allow")
             return Redirect($"{redirect_uri}{sep}error=access_denied" + (state != null ? $"&state={Uri.EscapeDataString(state)}" : ""));
