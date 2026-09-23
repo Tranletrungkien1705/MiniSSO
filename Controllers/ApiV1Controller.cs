@@ -308,6 +308,24 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         return Ok(new { ok = true, imported = res.Imported });
     }
 
+    // Xuất danh sách nhóm ra file (port từ iNOS.InBrand: SysGroupController.Export + ExportTemplate).
+    // iNOS xuất Excel theo 2 chế độ: dữ liệu thật (Code, DLCode, Description, Enable) và file mẫu rỗng
+    // (Code, DLCode, Description). MiniSSO trả về CSV (không kèm thư viện Excel) — tập cột giữ nguyên.
+    [HttpGet("groups/export")]
+    public async Task<IActionResult> ExportGroups(GroupExportService exporter)
+    {
+        var csv = await exporter.ExportCsvAsync();
+        return File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", "SysGroup.csv");
+    }
+
+    // File mẫu rỗng để điền rồi nhập lại (↔ SysGroupController.ExportTemplate).
+    [HttpGet("groups/export-template")]
+    public IActionResult ExportGroupsTemplate(GroupExportService exporter)
+    {
+        var csv = exporter.ExportTemplateCsv();
+        return File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", "SysGroup_Template.csv");
+    }
+
     // ── Truy vấn thành viên nhóm (port từ iNOS.InBrand: SysUserProvider.GetAllUserByGroupCode /
     //    GetAllUserNotInGroup + SysUserInGroupProvider.RemoveByUser) ──
     // Danh sách người dùng đang thuộc 1 nhóm (↔ GetAllUserByGroupCode).

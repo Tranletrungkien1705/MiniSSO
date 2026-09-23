@@ -1,0 +1,57 @@
+@{
+    ViewData["Title"] = "Xuất nhóm ra file";
+    var groups = (List<Group>)ViewBag.Groups;
+    var dataHeaders = (string[])ViewBag.DataHeaders;
+    var templateHeaders = (string[])ViewBag.TemplateHeaders;
+}
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Xuất danh sách nhóm</h6>
+            <p class="text-muted small">
+                Mô hình port từ iNOS.InBrand: <code>SysGroupController.Export</code> + <code>ExportTemplate</code>.
+                iNOS xuất Excel theo 2 chế độ; MiniSSO trả về CSV (không kèm thư viện Excel) — tập cột giữ nguyên.
+            </p>
+            <div class="d-grid gap-2">
+                <a class="btn btn-primary" href="/GroupExport/Export">
+                    <i class="bi bi-download me-1"></i>Xuất dữ liệu thật (@groups.Count nhóm)
+                </a>
+                <a class="btn btn-outline-primary" href="/GroupExport/ExportTemplate">
+                    <i class="bi bi-file-earmark-text me-1"></i>Xuất file mẫu rỗng
+                </a>
+            </div>
+            <div class="mt-3 small text-muted">
+                <div><b>Dữ liệu thật</b> — cột: <code>@string.Join(", ", dataHeaders)</code></div>
+                <div><b>File mẫu</b> — cột: <code>@string.Join(", ", templateHeaders)</code></div>
+                <div class="mt-1"><code>DLCode</code> = mã đơn vị (<code>Org.Code</code>), rỗng nếu nhóm toàn cục; <code>Enable</code> = 1/0.</div>
+            </div>
+        </div></div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Xem trước dữ liệu xuất</h6>
+            @if (groups.Count == 0)
+            {
+                <p class="text-muted mb-0">Chưa có nhóm nào.</p>
+            }
+            else
+            {
+                <table class="table align-middle mb-0">
+                    <thead><tr><th>Code</th><th>DLCode</th><th>Description</th><th>Enable</th></tr></thead>
+                    <tbody>
+                    @foreach (var g in groups)
+                    {
+                        <tr>
+                            <td><code>@g.Code</code></td>
+                            <td class="text-muted small">@(g.OrgId == null ? "—" : g.OrgId.ToString()![..8])</td>
+                            <td class="text-muted small">@(string.IsNullOrWhiteSpace(g.Description) ? "—" : g.Description)</td>
+                            <td>@(g.IsActive ? "1" : "0")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div></div>
+    </div>
+</div>

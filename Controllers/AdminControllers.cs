@@ -588,6 +588,35 @@ public class GroupImportController(AppDbContext db, GroupImportService importer)
     }
 }
 
+// Xuất danh sách nhóm ra file (port từ iNOS.InBrand: SysGroupController.Export + ExportTemplate).
+// iNOS xuất Excel theo 2 chế độ: dữ liệu thật (Code, DLCode, Description, Enable) và file mẫu rỗng
+// (Code, DLCode, Description). MiniSSO trả về CSV (không kèm thư viện Excel) — tập cột giữ nguyên.
+[Authorize]
+public class GroupExportController(AppDbContext db, GroupExportService exporter) : Controller
+{
+    public async Task<IActionResult> Index()
+    {
+        ViewBag.Groups = await db.Groups.OrderBy(g => g.Code).ToListAsync();
+        ViewBag.DataHeaders = GroupExportService.DataHeaders;
+        ViewBag.TemplateHeaders = GroupExportService.TemplateHeaders;
+        return View();
+    }
+
+    // Xuất dữ liệu thật (↔ SysGroupController.Export).
+    public async Task<IActionResult> Export()
+    {
+        var csv = await exporter.ExportCsvAsync();
+        return File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", "SysGroup.csv");
+    }
+
+    // Xuất file mẫu rỗng (↔ SysGroupController.ExportTemplate).
+    public IActionResult ExportTemplate()
+    {
+        var csv = exporter.ExportTemplateCsv();
+        return File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", "SysGroup_Template.csv");
+    }
+}
+
 // Tìm kiếm có phân trang + lọc phạm vi dữ liệu (port từ iNOS.InBrand:
 // SysUserManager.Search + SysGroupManager.Search). Màn hình cho chọn "người gọi" để thấy
 // kết quả bị lọc theo phạm vi dữ liệu của người đó (SysAdmin/nút gốc → thấy tất cả).
