@@ -775,6 +775,47 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         return Ok(new { ok = true, id = res.UserId });
     }
 
+    // ── Loại đại lý: Mst_DealerType (port từ iNOS.InBrand) ──
+    // Danh mục "loại đại lý" (DLType, DLTypeName, FlagActive) dùng để phân loại đơn vị/đại lý.
+    // MstDealerTypeManager áp mẫu CheckDB dùng chung: mã loại bắt buộc & chưa tồn tại khi tạo,
+    // phải tồn tại khi sửa; tên loại bắt buộc.
+    [HttpGet("dealer-types")]
+    public async Task<IActionResult> DealerTypes([FromQuery] bool? active, DealerTypeService dealerTypes)
+    {
+        var list = active == true ? await dealerTypes.ActiveAsync() : await dealerTypes.AllAsync();
+        return Ok(list.Select(t => new { t.Id, t.Code, t.Name, t.IsActive, t.CreatedAt }));
+    }
+
+    [HttpPost("dealer-types")]
+    public async Task<IActionResult> CreateDealerType([FromBody] DealerTypeReq r, DealerTypeService dealerTypes)
+    {
+        var res = await dealerTypes.CreateAsync(r.Code, r.Name);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
+        return Ok(new { ok = true });
+    }
+
+    [HttpPut("dealer-types/{id:guid}")]
+    public async Task<IActionResult> UpdateDealerType(Guid id, [FromBody] DealerTypeReq r, DealerTypeService dealerTypes)
+    {
+        var res = await dealerTypes.UpdateAsync(id, r.Name);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
+        return Ok(new { ok = true });
+    }
+
+    [HttpPost("dealer-types/{id:guid}/toggle")]
+    public async Task<IActionResult> ToggleDealerType(Guid id, DealerTypeService dealerTypes)
+    {
+        if (!await dealerTypes.ToggleAsync(id)) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new { ok = true });
+    }
+
+    [HttpDelete("dealer-types/{id:guid}")]
+    public async Task<IActionResult> DeleteDealerType(Guid id, DealerTypeService dealerTypes)
+    {
+        if (!await dealerTypes.DeleteAsync(id)) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new { ok = true });
+    }
+
     // Thông tin OIDC discovery (để SPA hiển thị hướng dẫn tích hợp).
     [HttpGet("oidc-info")]
     public IActionResult OidcInfo()
@@ -817,3 +858,5 @@ public class UserTeamReq { public string Code { get; set; } = ""; public string?
 public class GroupImportReq { public string? Content { get; set; } }
 // Tự đăng ký tham gia hệ thống (↔ AccountController.Join + SysUserManager.Register).
 public class RegisterReq { public string? Email { get; set; } public string? Password { get; set; } public string? FullName { get; set; } public string? PhoneNo { get; set; } public Guid? OrgId { get; set; } }
+// Loại đại lý (↔ Mst_DealerType: DLType, DLTypeName).
+public class DealerTypeReq { public string? Code { get; set; } public string? Name { get; set; } }

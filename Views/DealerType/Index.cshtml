@@ -1,0 +1,53 @@
+@model List<DealerType>
+@{
+    ViewData["Title"] = "Loại đại lý";
+}
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Thêm loại đại lý</h6>
+            <form asp-action="Create" method="post">@Html.AntiForgeryToken()
+                <div class="mb-2"><input name="code" class="form-control" placeholder="Mã loại * (vd DL_TYPE_1)" required /></div>
+                <div class="mb-3"><input name="name" class="form-control" placeholder="Tên loại * (vd Đại lý cấp 1)" required /></div>
+                <button class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i>Tạo loại đại lý</button>
+            </form>
+            <p class="text-muted small mt-3 mb-0">Mô hình port từ iNOS.InBrand: bảng <code>Mst_DealerType</code> (DLType, DLTypeName, FlagActive). Danh mục phân loại đơn vị/đại lý; khi tạo áp mẫu <b>CheckDB</b> (mã bắt buộc &amp; chưa tồn tại, tên bắt buộc).</p>
+        </div></div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Danh sách loại đại lý (@Model.Count)</h6>
+            @if (Model.Count == 0)
+            {
+                <p class="text-muted mb-0">Chưa có loại đại lý nào.</p>
+            }
+            else
+            {
+                <table class="table align-middle mb-0">
+                    <thead><tr><th>Mã loại</th><th>Tên loại</th><th>Trạng thái</th><th class="text-end">Thao tác</th></tr></thead>
+                    <tbody>
+                    @foreach (var t in Model)
+                    {
+                        <tr>
+                            <td><code>@t.Code</code></td>
+                            <td>
+                                <form asp-action="Update" method="post" class="d-flex gap-1">@Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@t.Id" />
+                                    <input name="name" class="form-control form-control-sm" value="@t.Name" />
+                                    <button class="btn btn-sm btn-outline-primary py-0">Lưu</button>
+                                </form>
+                            </td>
+                            <td>@if (t.IsActive) { <span class="badge bg-success">bật</span> } else { <span class="badge bg-secondary">khóa</span> }</td>
+                            <td class="text-end">
+                                <form asp-action="Toggle" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@t.Id" /><button class="btn btn-sm btn-outline-secondary py-0">@(t.IsActive ? "Khóa" : "Mở")</button></form>
+                                <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Xoá loại đại lý này?');">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@t.Id" /><button class="btn btn-sm btn-outline-danger py-0">Xoá</button></form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div></div>
+    </div>
+</div>

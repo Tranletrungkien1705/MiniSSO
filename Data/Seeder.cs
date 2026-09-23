@@ -114,6 +114,11 @@ public static class Seeder
                 "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_UserTeams_Code\" ON minisso.\"UserTeams\" (\"Code\")");
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS \"IX_UserTeams_OrgId\" ON minisso.\"UserTeams\" (\"OrgId\")");
+            // Loại đại lý (thêm sau) — EnsureCreated không tạo trên Postgres đã tồn tại.
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE TABLE IF NOT EXISTS minisso.\"DealerTypes\" (\"Id\" uuid PRIMARY KEY, \"Code\" text NOT NULL DEFAULT '', \"Name\" text NOT NULL DEFAULT '', \"IsActive\" boolean NOT NULL DEFAULT true, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_DealerTypes_Code\" ON minisso.\"DealerTypes\" (\"Code\")");
         }
 
         if (!await db.Licenses.AnyAsync())
@@ -137,6 +142,7 @@ public static class Seeder
         await SeedGroupModulesAsync(db);
         await SeedViewGroupsAsync(db);
         await SeedUserTeamsAsync(db);
+        await SeedDealerTypesAsync(db);
 
         if (!await db.Clients.AnyAsync())
         {
@@ -359,6 +365,21 @@ public static class Seeder
         if (orgs.TryGetValue("10", out var north2)) teams[1].OrgId = north2;
         if (orgs.TryGetValue("211", out var dongDo)) teams[2].OrgId = dongDo;
         db.UserTeams.AddRange(teams);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Seed loại đại lý (port từ iNOS.InBrand: Mst_DealerType).
+    /// Tạo vài loại phân loại đơn vị/đại lý (cấp 1, cấp 2, đại lý uỷ quyền).
+    /// </summary>
+    private static async Task SeedDealerTypesAsync(AppDbContext db)
+    {
+        if (await db.DealerTypes.AnyAsync()) return;
+
+        db.DealerTypes.AddRange(
+            new DealerType { Code = "DL_TYPE_1", Name = "Đại lý cấp 1" },
+            new DealerType { Code = "DL_TYPE_2", Name = "Đại lý cấp 2" },
+            new DealerType { Code = "DL_TYPE_AUTH", Name = "Đại lý uỷ quyền" });
         await db.SaveChangesAsync();
     }
 }

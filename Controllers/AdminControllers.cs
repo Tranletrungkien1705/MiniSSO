@@ -716,3 +716,44 @@ public class RegisterController(AppDbContext db, RegistrationService registratio
         return RedirectToAction(nameof(Index));
     }
 }
+
+// Loại đại lý: Mst_DealerType (port từ iNOS.InBrand) — danh mục phân loại đơn vị/đại lý.
+// MstDealerTypeManager áp mẫu CheckDB dùng chung: mã loại bắt buộc & chưa tồn tại khi tạo,
+// phải tồn tại khi sửa; tên loại bắt buộc.
+[Authorize]
+public class DealerTypeController(DealerTypeService dealerTypes) : Controller
+{
+    public async Task<IActionResult> Index()
+        => View(await dealerTypes.AllAsync());
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(string code, string? name)
+    {
+        var res = await dealerTypes.CreateAsync(code, name);
+        if (!res.Ok) TempData["Error"] = res.Error; else TempData["Success"] = "Đã tạo loại đại lý.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Update(Guid id, string? name)
+    {
+        var res = await dealerTypes.UpdateAsync(id, name);
+        if (!res.Ok) TempData["Error"] = res.Error; else TempData["Success"] = "Đã cập nhật loại đại lý.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Toggle(Guid id)
+    {
+        await dealerTypes.ToggleAsync(id);
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        if (await dealerTypes.DeleteAsync(id)) TempData["Success"] = "Đã xoá loại đại lý.";
+        else TempData["Error"] = "Không tìm thấy loại đại lý.";
+        return RedirectToAction(nameof(Index));
+    }
+}

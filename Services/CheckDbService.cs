@@ -29,7 +29,7 @@ public sealed class CheckDbService(AppDbContext db)
     public const string FlagInactive = "0";   // Flag.Inactive / Flag.No
 
     /// <summary>Loại thực thể có thể kiểm tra (↔ các *CheckDB của iNOS).</summary>
-    public enum EntityKind { User, Group, Module, Org }
+    public enum EntityKind { User, Group, Module, Org, DealerType }
 
     /// <summary>Kết quả 1 lần kiểm tra: hợp lệ hay không + lý do + trạng thái thực tế của bản ghi.</summary>
     public sealed record CheckResult(bool Ok, string? Error, bool Exists, string Status)
@@ -80,6 +80,8 @@ public sealed class CheckDbService(AppDbContext db)
                 .FirstOrDefaultAsync() is { } m ? (true, m.IsActive) : (false, false),
             EntityKind.Org => await db.Orgs.Where(o => o.Code == code).Select(o => new { o.IsActive })
                 .FirstOrDefaultAsync() is { } o ? (true, o.IsActive) : (false, false),
+            EntityKind.DealerType => await db.DealerTypes.Where(t => t.Code == code).Select(t => new { t.IsActive })
+                .FirstOrDefaultAsync() is { } t ? (true, t.IsActive) : (false, false),
             _ => (false, false)
         };
     }
@@ -90,6 +92,7 @@ public sealed class CheckDbService(AppDbContext db)
         EntityKind.Group => "Nhóm",
         EntityKind.Module => "Module",
         EntityKind.Org => "Đơn vị tổ chức",
+        EntityKind.DealerType => "Loại đại lý",
         _ => "Bản ghi"
     };
 }

@@ -323,6 +323,23 @@ public class UserTeam
 // HasFunction(code) để màn hình kiểm tra nhanh quyền. MiniSSO trước đây chỉ có các mảnh rời
 // (RbacService, ModuleService, DataScopeService) nhưng KHÔNG có 1 đối tượng "phiên" gộp lại.
 
+// ── Loại đại lý: Mst_DealerType (port từ iNOS.InBrand) ──
+// iNOS có bảng Mst_DealerType (DLType PK, DLTypeName, FlagActive) — danh mục "loại đại lý" dùng để
+// PHÂN LOẠI các đại lý/đơn vị (Mst_Dealer.DLType trỏ tới đây). MstDealerTypeManager.MstDealerTypeCheckDB
+// áp đúng mẫu CheckDB dùng chung: "1" = loại PHẢI tồn tại, "0" = loại PHẢI chưa tồn tại, và trạng thái
+// thực tế (FlagActive) phải nằm trong danh sách cờ cho phép. MiniSSO trước đây có Org (đơn vị) nhưng
+// KHÔNG có danh mục "loại đại lý" để phân loại đơn vị.
+
+/// <summary>Loại đại lý (tương ứng Mst_DealerType): danh mục phân loại đơn vị/đại lý.</summary>
+public class DealerType
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Code { get; set; } = "";        // mã loại (Mst_DealerType.DLType) — duy nhất
+    public string Name { get; set; } = "";        // tên loại (Mst_DealerType.DLTypeName)
+    public bool IsActive { get; set; } = true;     // Mst_DealerType.FlagActive
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 /// <summary>Phiên làm việc (tương ứng GlobSession): 1 lần đăng nhập của người dùng, có mã phiên.</summary>
 public class UserSession
 {
