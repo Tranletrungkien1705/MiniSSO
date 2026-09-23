@@ -12,6 +12,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<SigningKey> SigningKeys => Set<SigningKey>();
     public DbSet<AppLicense> Licenses => Set<AppLicense>();
     public DbSet<LicenseCheckLog> LicenseCheckLogs => Set<LicenseCheckLog>();
+    public DbSet<Group> Groups => Set<Group>();
+    public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
+    public DbSet<PermissionObject> PermissionObjects => Set<PermissionObject>();
+    public DbSet<GroupAccess> GroupAccesses => Set<GroupAccess>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -21,5 +25,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<RefreshToken>().HasIndex(x => x.Token).IsUnique();
         b.Entity<AuthCode>().HasIndex(x => x.Code).IsUnique();
         b.Entity<AppLicense>().HasIndex(x => x.LicenseKey).IsUnique();
+        b.Entity<Group>(e => e.HasIndex(x => x.Code).IsUnique());
+        b.Entity<GroupMember>(e => e.HasIndex(x => new { x.GroupId, x.UserId }).IsUnique());
+        b.Entity<PermissionObject>(e => e.HasIndex(x => x.Code).IsUnique());
+        b.Entity<GroupAccess>(e => e.HasIndex(x => new { x.GroupId, x.ObjectId }).IsUnique());
     }
 }

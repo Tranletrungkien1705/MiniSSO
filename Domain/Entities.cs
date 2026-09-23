@@ -95,3 +95,48 @@ public class LicenseCheckLog
     public string? Message { get; set; }
     public DateTime CheckedAt { get; set; } = DateTime.UtcNow;
 }
+
+// ── RBAC theo nhóm (port từ iNOS.InBrand: Sys_Group / Sys_UserInGroup / Sys_Access / Sys_Object) ──
+// iNOS gán quyền qua chuỗi: User → UserInGroup → Group → Access → Object (chức năng/module).
+// MiniSSO trước đây chỉ có Roles csv phẳng trên AppUser; bổ sung mô hình nhóm + đối tượng quyền
+// để suy ra "quyền hiệu lực" (effective permissions) của 1 người dùng.
+
+/// <summary>Nhóm quyền (tương ứng Sys_Group). Người dùng thuộc nhiều nhóm; nhóm được cấp nhiều đối tượng quyền.</summary>
+public class Group
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Code { get; set; } = "";        // mã nhóm, vd "SYSADMIN" (Sys_Group.GroupCode)
+    public string Name { get; set; } = "";        // tên hiển thị (Sys_Group.GroupName)
+    public string? Description { get; set; }
+    public bool IsActive { get; set; } = true;    // Sys_Group.FlagActive
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Thành viên nhóm (tương ứng Sys_UserInGroup): quan hệ nhiều-nhiều User ↔ Group.</summary>
+public class GroupMember
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid GroupId { get; set; }
+    public Guid UserId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Đối tượng quyền (tương ứng Sys_Object): 1 chức năng/màn hình/module được bảo vệ.</summary>
+public class PermissionObject
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Code { get; set; } = "";        // mã đối tượng, vd "user.manage" (Sys_Object.ObjectCode)
+    public string Name { get; set; } = "";        // tên hiển thị (Sys_Object.ObjectName)
+    public string? Module { get; set; }           // nhóm chức năng (Sys_Object.ServiceCode)
+    public bool IsActive { get; set; } = true;    // Sys_Object.FlagActive
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Cấp quyền (tương ứng Sys_Access): nhóm được phép truy cập 1 đối tượng quyền.</summary>
+public class GroupAccess
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid GroupId { get; set; }
+    public Guid ObjectId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

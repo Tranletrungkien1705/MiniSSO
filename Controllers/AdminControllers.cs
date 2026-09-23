@@ -34,6 +34,61 @@ public class UserController(AppDbContext db) : Controller
 }
 
 [Authorize]
+public class GroupController(AppDbContext db) : Controller
+{
+    public async Task<IActionResult> Index()
+    {
+        ViewBag.Objects = await db.PermissionObjects.OrderBy(o => o.Code).ToListAsync();
+        ViewBag.Users = await db.Users.OrderBy(u => u.Email).ToListAsync();
+        ViewBag.Members = await db.GroupMembers.ToListAsync();
+        ViewBag.Access = await db.GroupAccesses.ToListAsync();
+        return View(await db.Groups.OrderBy(g => g.Code).ToListAsync());
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(string code, string? name, string? description)
+    {
+        if (string.IsNullOrWhiteSpace(code)) { TempData["Error"] = "Cần mã nhóm."; return RedirectToAction(nameof(Index)); }
+        var c = code.Trim().ToUpperInvariant();
+        if (await db.Groups.AnyAsync(g => g.Code == c)) { TempData["Error"] = "Mã nhóm đã tồn tại."; return RedirectToAction(nameof(Index)); }
+        db.Groups.Add(new Group { Code = c, Name = string.IsNullOrWhiteSpace(name) ? c : name!.Trim(), Description = description });
+        await db.SaveChangesAsync();
+        TempData["Success"] = "Đã tạo nhóm.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Toggle(Guid id)
+    {
+        var g = await db.Groups.FirstOrDefaultAsync(x => x.Id == id);
+        if (g != null) { g.IsActive = !g.IsActive; await db.SaveChangesAsync(); }
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Cấp/thu quyền đối tượng cho nhóm (Sys_Access).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetAccess(Guid groupId, Guid objectId, bool grant)
+    {
+        var existing = await db.GroupAccesses.FirstOrDefaultAsync(a => a.GroupId == groupId && a.ObjectId == objectId);
+        if (grant && existing == null) db.GroupAccesses.Add(new GroupAccess { GroupId = groupId, ObjectId = objectId });
+        else if (!grant && existing != null) db.GroupAccesses.Remove(existing);
+        await db.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Thêm/bớt thành viên nhóm (Sys_UserInGroup).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetMember(Guid groupId, Guid userId, bool add)
+    {
+        var existing = await db.GroupMembers.FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == userId);
+        if (add && existing == null) db.GroupMembers.Add(new GroupMember { GroupId = groupId, UserId = userId });
+        else if (!add && existing != null) db.GroupMembers.Remove(existing);
+        await db.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
+    }
+}
+
+[Authorize]
 public class ClientController(AppDbContext db) : Controller
 {
     public async Task<IActionResult> Index() => View(await db.Clients.OrderBy(c => c.ClientId).ToListAsync());

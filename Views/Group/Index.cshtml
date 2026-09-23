@@ -1,0 +1,66 @@
+@model List<Group>
+@{
+    ViewData["Title"] = "Nhóm & Phân quyền";
+    var objects = (List<PermissionObject>)ViewBag.Objects;
+    var users = (List<AppUser>)ViewBag.Users;
+    var members = (List<GroupMember>)ViewBag.Members;
+    var access = (List<GroupAccess>)ViewBag.Access;
+}
+<div class="row g-3">
+    <div class="col-lg-4"><div class="card"><div class="card-body">
+        <h6 class="fw-bold mb-3">Thêm nhóm</h6>
+        <form asp-action="Create" method="post">@Html.AntiForgeryToken()
+            <div class="mb-2"><input name="code" class="form-control" placeholder="Mã nhóm * (vd SYSADMIN)" required /></div>
+            <div class="mb-2"><input name="name" class="form-control" placeholder="Tên hiển thị" /></div>
+            <div class="mb-3"><input name="description" class="form-control" placeholder="Mô tả" /></div>
+            <button class="btn btn-primary w-100"><i class="bi bi-diagram-3 me-1"></i>Tạo nhóm</button>
+        </form>
+        <p class="text-muted small mt-3 mb-0">Mô hình RBAC port từ iNOS.InBrand: Người dùng → Nhóm → Cấp quyền → Đối tượng quyền.</p>
+    </div></div></div>
+
+    <div class="col-lg-8">
+        @foreach (var g in Model)
+        {
+            var gMembers = members.Where(m => m.GroupId == g.Id).ToList();
+            var gAccess = access.Where(a => a.GroupId == g.Id).Select(a => a.ObjectId).ToHashSet();
+            <div class="card mb-3"><div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div>
+                        <span class="fw-bold">@g.Code</span>
+                        <span class="text-muted ms-2">@g.Name</span>
+                        @if (g.IsActive) { <span class="badge bg-success ms-2">bật</span> } else { <span class="badge bg-secondary ms-2">khóa</span> }
+                    </div>
+                    <form asp-action="Toggle" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@g.Id" /><button class="btn btn-sm btn-outline-secondary">@(g.IsActive ? "Khóa" : "Mở")</button></form>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(g.Description)) { <p class="text-muted small mb-2">@g.Description</p> }
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="small fw-semibold text-uppercase text-muted mb-1">Đối tượng quyền (@gAccess.Count)</div>
+                        @foreach (var o in objects)
+                        {
+                            var has = gAccess.Contains(o.Id);
+                            <form asp-action="SetAccess" method="post" class="d-flex align-items-center justify-content-between border-bottom py-1">@Html.AntiForgeryToken()
+                                <input type="hidden" name="groupId" value="@g.Id" /><input type="hidden" name="objectId" value="@o.Id" /><input type="hidden" name="grant" value="@((!has).ToString().ToLower())" />
+                                <span class="small"><code>@o.Code</code> <span class="text-muted">@o.Name</span></span>
+                                <button class="btn btn-sm @(has ? "btn-outline-danger" : "btn-outline-primary")">@(has ? "Thu" : "Cấp")</button>
+                            </form>
+                        }
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small fw-semibold text-uppercase text-muted mb-1">Thành viên (@gMembers.Count)</div>
+                        @foreach (var u in users)
+                        {
+                            var isMember = gMembers.Any(m => m.UserId == u.Id);
+                            <form asp-action="SetMember" method="post" class="d-flex align-items-center justify-content-between border-bottom py-1">@Html.AntiForgeryToken()
+                                <input type="hidden" name="groupId" value="@g.Id" /><input type="hidden" name="userId" value="@u.Id" /><input type="hidden" name="add" value="@((!isMember).ToString().ToLower())" />
+                                <span class="small">@u.Email</span>
+                                <button class="btn btn-sm @(isMember ? "btn-outline-danger" : "btn-outline-primary")">@(isMember ? "Bớt" : "Thêm")</button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </div></div>
+        }
+    </div>
+</div>

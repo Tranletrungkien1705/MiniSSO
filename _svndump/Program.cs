@@ -32,7 +32,7 @@ if (mode == "list")
 foreach (var (path, sum) in rows)
 {
     var hex = sum.Replace("$sha1$", "");
-    var file = Path.Combine(pristineRoot, hex[..2], hex[2..] + ".svn-base");
+    var file = Path.Combine(pristineRoot, hex[..2], hex + ".svn-base");
     Console.Error.WriteLine($"TRY: [{file}] exists={File.Exists(file)}");
     if (!File.Exists(file)) { Console.Error.WriteLine($"MISSING pristine: {file}"); continue; }
     Console.WriteLine($"===== {path} =====");

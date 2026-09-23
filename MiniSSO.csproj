@@ -8,6 +8,9 @@
   <ItemGroup>
     <Compile Remove="MiniSSO.Tests/**/*.cs" />
     <Content Remove="MiniSSO.Tests/**/*" />
+    <Compile Remove="_svndump/**/*.cs" />
+    <Content Remove="_svndump/**/*" />
+    <None Remove="_svndump/**/*" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.0" />

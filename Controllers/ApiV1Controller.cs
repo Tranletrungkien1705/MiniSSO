@@ -13,7 +13,7 @@ namespace MiniSSO.Controllers;
 [ApiController]
 [Route("api/v1")]
 [Produces("application/json")]
-public class ApiV1Controller(AppDbContext db, ICache cache) : ControllerBase
+public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac) : ControllerBase
 {
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard()
@@ -119,6 +119,79 @@ public class ApiV1Controller(AppDbContext db, ICache cache) : ControllerBase
         return Ok(logs.Select(log => new { log.AppSlug, log.InstanceHost, log.RemoteIp, log.Result, log.Message, log.CheckedAt }));
     }
 
+    // ── RBAC theo nhóm (port từ iNOS.InBrand: Sys_Group / Sys_UserInGroup / Sys_Access / Sys_Object) ──
+    [HttpGet("groups")]
+    public async Task<IActionResult> Groups()
+    {
+        var groups = await db.Groups.OrderBy(g => g.Code).ToListAsync();
+        var memberCounts = await db.GroupMembers.GroupBy(m => m.GroupId).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count);
+        var accessCounts = await db.GroupAccesses.GroupBy(a => a.GroupId).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count);
+        return Ok(groups.Select(g => new
+        {
+            g.Id, g.Code, g.Name, g.Description, g.IsActive,
+            members = memberCounts.GetValueOrDefault(g.Id), permissions = accessCounts.GetValueOrDefault(g.Id)
+        }));
+    }
+
+    [HttpPost("groups")]
+    public async Task<IActionResult> CreateGroup([FromBody] GroupReq r)
+    {
+        if (string.IsNullOrWhiteSpace(r.Code)) return BadRequest(new { error = "Cần mã nhóm." });
+        var code = r.Code.Trim().ToUpperInvariant();
+        if (await db.Groups.AnyAsync(g => g.Code == code)) return BadRequest(new { error = "Mã nhóm đã tồn tại." });
+        var g = new Group { Code = code, Name = string.IsNullOrWhiteSpace(r.Name) ? code : r.Name!.Trim(), Description = r.Description };
+        db.Groups.Add(g); await db.SaveChangesAsync();
+        return Ok(new { id = g.Id });
+    }
+
+    [HttpPost("groups/{id:guid}/toggle")]
+    public async Task<IActionResult> ToggleGroup(Guid id)
+    {
+        var g = await db.Groups.FirstOrDefaultAsync(x => x.Id == id);
+        if (g == null) return NotFound(new { error = "Không tìm thấy." });
+        g.IsActive = !g.IsActive; await db.SaveChangesAsync();
+        return Ok(new { ok = true, isActive = g.IsActive });
+    }
+
+    [HttpGet("objects")]
+    public async Task<IActionResult> Objects()
+        => Ok((await db.PermissionObjects.OrderBy(o => o.Code).ToListAsync()).Select(o => new { o.Id, o.Code, o.Name, o.Module, o.IsActive }));
+
+    // Cấp/thu quyền đối tượng cho nhóm (Sys_Access).
+    [HttpPost("groups/{id:guid}/access")]
+    public async Task<IActionResult> SetGroupAccess(Guid id, [FromBody] GroupAccessReq r)
+    {
+        if (!await db.Groups.AnyAsync(g => g.Id == id)) return NotFound(new { error = "Không tìm thấy nhóm." });
+        var obj = await db.PermissionObjects.FirstOrDefaultAsync(o => o.Code == r.ObjectCode);
+        if (obj == null) return BadRequest(new { error = "Đối tượng quyền không tồn tại." });
+        var existing = await db.GroupAccesses.FirstOrDefaultAsync(a => a.GroupId == id && a.ObjectId == obj.Id);
+        if (r.Grant && existing == null) db.GroupAccesses.Add(new GroupAccess { GroupId = id, ObjectId = obj.Id });
+        else if (!r.Grant && existing != null) db.GroupAccesses.Remove(existing);
+        await db.SaveChangesAsync();
+        return Ok(new { ok = true, granted = r.Grant });
+    }
+
+    // Thêm/bớt thành viên nhóm (Sys_UserInGroup).
+    [HttpPost("groups/{id:guid}/members")]
+    public async Task<IActionResult> SetGroupMember(Guid id, [FromBody] GroupMemberReq r)
+    {
+        if (!await db.Groups.AnyAsync(g => g.Id == id)) return NotFound(new { error = "Không tìm thấy nhóm." });
+        if (!await db.Users.AnyAsync(u => u.Id == r.UserId)) return BadRequest(new { error = "Người dùng không tồn tại." });
+        var existing = await db.GroupMembers.FirstOrDefaultAsync(m => m.GroupId == id && m.UserId == r.UserId);
+        if (r.Add && existing == null) db.GroupMembers.Add(new GroupMember { GroupId = id, UserId = r.UserId });
+        else if (!r.Add && existing != null) db.GroupMembers.Remove(existing);
+        await db.SaveChangesAsync();
+        return Ok(new { ok = true, added = r.Add });
+    }
+
+    // Quyền hiệu lực của 1 người dùng (hợp các đối tượng quyền qua mọi nhóm đang hoạt động).
+    [HttpGet("users/{id:guid}/permissions")]
+    public async Task<IActionResult> UserPermissions(Guid id)
+    {
+        if (!await db.Users.AnyAsync(u => u.Id == id)) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new { userId = id, groups = await rbac.GroupCodesAsync(id), permissions = await rbac.EffectivePermissionsAsync(id) });
+    }
+
     // Thông tin OIDC discovery (để SPA hiển thị hướng dẫn tích hợp).
     [HttpGet("oidc-info")]
     public IActionResult OidcInfo()
@@ -137,3 +210,6 @@ public record DashDto(int Users, int ActiveUsers, int Clients, int ActiveTokens,
 public class UserReq { public string Email { get; set; } = ""; public string Password { get; set; } = ""; public string? FullName { get; set; } public string? Roles { get; set; } public string? Tenant { get; set; } }
 public class ClientReq { public string ClientId { get; set; } = ""; public string? Name { get; set; } public string? RedirectUris { get; set; } public string? Grants { get; set; } public string? Scopes { get; set; } public string? Secret { get; set; } public bool RequirePkce { get; set; } = true; }
 public class LicenseCheckReq { public string? LicenseKey { get; set; } public string? AppSlug { get; set; } public string? InstanceHost { get; set; } }
+public class GroupReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Description { get; set; } }
+public class GroupAccessReq { public string ObjectCode { get; set; } = ""; public bool Grant { get; set; } = true; }
+public class GroupMemberReq { public Guid UserId { get; set; } public bool Add { get; set; } = true; }
