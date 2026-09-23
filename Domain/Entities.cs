@@ -22,6 +22,12 @@ public class AppUser
     public string? VerificationCode { get; set; }          // SysUser.VerificationCode — mã xác thực (đặt lại mật khẩu)
     public DateTime? LastLoginAt { get; set; }             // lần đăng nhập thành công gần nhất
 
+    // ── Phạm vi dữ liệu (port từ iNOS.InBrand SysUser: SysAdmin / DLCode) ──
+    // iNOS gắn mỗi người dùng vào 1 đại lý (DLCode) nằm trong cây đại lý; người dùng chỉ thấy dữ liệu
+    // thuộc nhánh của mình, trừ khi là SysAdmin hoặc ở nút gốc. MiniSSO trước đây không có khái niệm này.
+    public bool IsSysAdmin { get; set; }                   // SysUser.SysAdmin — bỏ qua mọi giới hạn phạm vi
+    public Guid? OrgId { get; set; }                       // đơn vị tổ chức người dùng thuộc về (tương ứng SysUser.DLCode)
+
     public string[] RoleList => string.IsNullOrWhiteSpace(Roles) ? [] : Roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }
 

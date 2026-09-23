@@ -180,3 +180,40 @@ public class OrgController(AppDbContext db, OrgService orgs) : Controller
         return RedirectToAction(nameof(Index));
     }
 }
+
+// Phạm vi dữ liệu (port từ iNOS.InBrand: SysUserProvider "ViewAbility").
+[Authorize]
+public class DataScopeController(AppDbContext db, DataScopeService scope) : Controller
+{
+    public async Task<IActionResult> Index()
+    {
+        var users = await db.Users.OrderBy(u => u.Email).ToListAsync();
+        var orgs = await db.Orgs.OrderBy(o => o.BuCode).ToListAsync();
+        var orgById = orgs.ToDictionary(o => o.Id);
+
+        // Phạm vi hiệu lực của từng người dùng (danh sách đơn vị được thấy).
+        var visible = new Dictionary<Guid, List<Org>>();
+        foreach (var u in users)
+            visible[u.Id] = await scope.VisibleOrgsAsync(u.Id);
+
+        ViewBag.Orgs = orgs;
+        ViewBag.OrgById = orgById;
+        ViewBag.Visible = visible;
+        return View(users);
+    }
+
+    // Gắn người dùng vào 1 đơn vị tổ chức + cờ SysAdmin (tương ứng SysUser.DLCode / SysUser.SysAdmin).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetScope(Guid userId, Guid? orgId, bool isSysAdmin)
+    {
+        var u = await db.Users.FirstOrDefaultAsync(x => x.Id == userId);
+        if (u == null) { TempData["Error"] = "Không tìm thấy người dùng."; return RedirectToAction(nameof(Index)); }
+        if (orgId != null && !await db.Orgs.AnyAsync(o => o.Id == orgId))
+        { TempData["Error"] = "Đơn vị tổ chức không tồn tại."; return RedirectToAction(nameof(Index)); }
+        u.IsSysAdmin = isSysAdmin;
+        u.OrgId = orgId;
+        await db.SaveChangesAsync();
+        TempData["Success"] = "Đã cập nhật phạm vi dữ liệu.";
+        return RedirectToAction(nameof(Index));
+    }
+}

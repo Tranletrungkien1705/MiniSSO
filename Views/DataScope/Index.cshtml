@@ -1,0 +1,80 @@
+@model List<AppUser>
+@{
+    ViewData["Title"] = "Phạm vi dữ liệu";
+    var orgs = (List<Org>)ViewBag.Orgs;
+    var orgById = (Dictionary<Guid, Org>)ViewBag.OrgById;
+    var visible = (Dictionary<Guid, List<Org>>)ViewBag.Visible;
+}
+<div class="row g-3">
+    <div class="col-12"><div class="card"><div class="card-body">
+        <h6 class="fw-bold mb-1">Phạm vi dữ liệu theo nhánh tổ chức</h6>
+        <p class="text-muted small mb-3">
+            Port từ iNOS.InBrand (<code>SysUserProvider</code> "ViewAbility"): mỗi người dùng gắn vào 1 đơn vị tổ chức
+            (tương ứng <code>SysUser.DLCode</code>) và chỉ thấy dữ liệu thuộc nhánh của mình — trừ khi bật
+            <strong>SysAdmin</strong> (thấy tất cả) hoặc thuộc đơn vị gốc. Phạm vi hiệu lực = chính đơn vị + toàn bộ nhánh con
+            (khớp tiền tố <code>BuCode</code>).
+        </p>
+        <table class="table table-sm align-middle mb-0">
+            <thead><tr><th>Người dùng</th><th>Đơn vị</th><th>SysAdmin</th><th>Phạm vi hiệu lực</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var u in Model)
+            {
+                var org = u.OrgId != null && orgById.TryGetValue(u.OrgId.Value, out var o) ? o : null;
+                var vis = visible.GetValueOrDefault(u.Id) ?? new List<Org>();
+                var unrestricted = u.IsSysAdmin || (org != null && org.BuCode == "0");
+                <tr>
+                    <td>
+                        <span class="fw-semibold">@u.FullName</span>
+                        <div class="text-muted small">@u.Email</div>
+                    </td>
+                    <td>
+                        @if (org != null)
+                        {
+                            <code>@org.BuCode</code> <span class="ms-1">@org.Name</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">— chưa gắn —</span>
+                        }
+                    </td>
+                    <td>
+                        @if (u.IsSysAdmin) { <span class="badge bg-danger">SysAdmin</span> }
+                        else { <span class="text-muted">—</span> }
+                    </td>
+                    <td>
+                        @if (unrestricted)
+                        {
+                            <span class="badge bg-success">Toàn bộ cây (@orgs.Count đơn vị)</span>
+                        }
+                        else if (vis.Count == 0)
+                        {
+                            <span class="badge bg-secondary">Không thấy dữ liệu</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-primary">@vis.Count đơn vị</span>
+                            <span class="text-muted small ms-1">@string.Join(", ", vis.Select(v => v.BuCode))</span>
+                        }
+                    </td>
+                    <td class="text-end">
+                        <form asp-action="SetScope" method="post" class="d-flex gap-1 justify-content-end">@Html.AntiForgeryToken()
+                            <input type="hidden" name="userId" value="@u.Id" />
+                            <select name="orgId" class="form-select form-select-sm" style="width:auto">
+                                <option value="">— Không gắn —</option>
+                                @foreach (var o in orgs)
+                                {
+                                    <option value="@o.Id" selected="@(u.OrgId == o.Id)">@o.BuCode · @o.Name</option>
+                                }
+                            </select>
+                            <label class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
+                                <input type="checkbox" name="isSysAdmin" value="true" checked="@u.IsSysAdmin" /> SysAdmin
+                            </label>
+                            <button class="btn btn-sm btn-primary">Lưu</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div></div></div>
+</div>

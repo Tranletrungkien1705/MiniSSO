@@ -13,7 +13,7 @@ namespace MiniSSO.Controllers;
 [ApiController]
 [Route("api/v1")]
 [Produces("application/json")]
-public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security) : ControllerBase
+public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security, DataScopeService scope) : ControllerBase
 {
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard()
@@ -33,7 +33,7 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
     [HttpGet("users")]
     public async Task<IActionResult> Users()
         => Ok((await db.Users.OrderBy(u => u.Email).ToListAsync()).Select(u => new { u.Id, u.Email, u.FullName, roles = u.RoleList, u.Tenant, u.IsActive, u.CreatedAt,
-            u.FailedLoginCount, u.IsLockedOut, u.LockoutDate, u.LockoutUntil, u.LastLoginAt }));
+            u.FailedLoginCount, u.IsLockedOut, u.LockoutDate, u.LockoutUntil, u.LastLoginAt, u.IsSysAdmin, u.OrgId }));
 
     [HttpPost("users")]
     public async Task<IActionResult> CreateUser([FromBody] UserReq r)
@@ -252,6 +252,45 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         return Ok(nodes.Select(o => new { o.Id, o.Code, o.Name, o.BuCode, o.Level }));
     }
 
+    // ── Phạm vi dữ liệu (port từ iNOS.InBrand: SysUserProvider "ViewAbility") ──
+    // Gắn người dùng vào 1 đơn vị tổ chức + cờ SysAdmin (tương ứng SysUser.DLCode / SysUser.SysAdmin).
+    [HttpPost("users/{id:guid}/scope")]
+    public async Task<IActionResult> SetUserScope(Guid id, [FromBody] UserScopeReq r)
+    {
+        var u = await db.Users.FirstOrDefaultAsync(x => x.Id == id);
+        if (u == null) return NotFound(new { error = "Không tìm thấy." });
+        if (r.OrgId != null && !await db.Orgs.AnyAsync(o => o.Id == r.OrgId))
+            return BadRequest(new { error = "Đơn vị tổ chức không tồn tại." });
+        u.IsSysAdmin = r.IsSysAdmin;
+        u.OrgId = r.OrgId;
+        await db.SaveChangesAsync();
+        return Ok(new { ok = true, isSysAdmin = u.IsSysAdmin, orgId = u.OrgId });
+    }
+
+    // Phạm vi dữ liệu hiệu lực của 1 người dùng: danh sách đơn vị họ được phép thấy.
+    [HttpGet("users/{id:guid}/scope")]
+    public async Task<IActionResult> UserScope(Guid id)
+    {
+        var u = await db.Users.FirstOrDefaultAsync(x => x.Id == id);
+        if (u == null) return NotFound(new { error = "Không tìm thấy." });
+        var visible = await scope.VisibleOrgsAsync(id);
+        var unrestricted = await scope.VisibleOrgIdsAsync(id) == null;
+        return Ok(new
+        {
+            userId = id, u.IsSysAdmin, u.OrgId, unrestricted,
+            visibleOrgs = visible.Select(o => new { o.Id, o.Code, o.Name, o.BuCode, o.Level })
+        });
+    }
+
+    // Kiểm tra 1 người dùng có được thấy 1 đơn vị tổ chức hay không (↔ myCache_ViewAbility_CheckAccessDealer).
+    [HttpGet("users/{id:guid}/scope/check")]
+    public async Task<IActionResult> CheckScope(Guid id, [FromQuery] Guid orgId)
+    {
+        if (!await db.Users.AnyAsync(u => u.Id == id)) return NotFound(new { error = "Không tìm thấy." });
+        var allowed = await scope.CanAccessOrgAsync(id, orgId);
+        return Ok(new { userId = id, orgId, allowed });
+    }
+
     // Thông tin OIDC discovery (để SPA hiển thị hướng dẫn tích hợp).
     [HttpGet("oidc-info")]
     public IActionResult OidcInfo()
@@ -273,6 +312,6 @@ public class LicenseCheckReq { public string? LicenseKey { get; set; } public st
 public class GroupReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Description { get; set; } }
 public class GroupAccessReq { public string ObjectCode { get; set; } = ""; public bool Grant { get; set; } = true; }
 public class GroupMemberReq { public Guid UserId { get; set; } public bool Add { get; set; } = true; }
-public class OrgReq { public string Code { get; set; } = ""; public string? Name { get; set; } public Guid? ParentId { get; set; } public string? Remark { get; set; }
-}
+public class OrgReq { public string Code { get; set; } = ""; public string? Name { get; set; } public Guid? ParentId { get; set; } public string? Remark { get; set; } }
+public class UserScopeReq { public bool IsSysAdmin { get; set; } public Guid? OrgId { get; set; } }
 public class ResetPasswordReq { public string NewPassword { get; set; } = ""; }

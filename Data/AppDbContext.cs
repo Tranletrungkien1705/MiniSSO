@@ -22,7 +22,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     protected override void OnModelCreating(ModelBuilder b)
     {
         if (Database.IsNpgsql()) b.HasDefaultSchema("minisso");
-        b.Entity<AppUser>(e => { e.HasIndex(x => x.Email).IsUnique(); e.Ignore(x => x.RoleList); });
+        b.Entity<AppUser>(e => { e.HasIndex(x => x.Email).IsUnique(); e.HasIndex(x => x.OrgId); e.Ignore(x => x.RoleList); });
         b.Entity<Client>(e => { e.HasIndex(x => x.ClientId).IsUnique(); e.Ignore(x => x.Redirects); e.Ignore(x => x.Grants); e.Ignore(x => x.Scopes); });
         b.Entity<RefreshToken>().HasIndex(x => x.Token).IsUnique();
         b.Entity<AuthCode>().HasIndex(x => x.Code).IsUnique();

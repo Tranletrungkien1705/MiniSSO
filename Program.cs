@@ -25,6 +25,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AccountSecurityService>();
 builder.Services.AddScoped<RbacService>();
 builder.Services.AddScoped<OrgService>();
+builder.Services.AddScoped<DataScopeService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(o => { o.LoginPath = "/Account/Login"; o.Cookie.Name = "minisso.sid"; });
 builder.Services.AddAuthorization();
