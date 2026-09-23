@@ -1,0 +1,21 @@
+[22:28:24 WRN] () The WebRootPath was not found: D:\idocNet\_labs\wwwroot. Static files may be unavailable.
+[22:30:32 INF] (e142ac62b1a844d2) HTTP GET /Account/Login responded 200 in 198.0447 ms
+[22:30:33 INF] (f819a995d5bf4a35) HTTP POST /Account/Login responded 302 in 363.0385 ms
+[22:30:33 INF] (94d07c5b3e7f4228) HTTP GET / responded 302 in 2.1364 ms
+[22:30:33 INF] (b4fdc20484384265) HTTP GET /index.html responded 404 in 1.0544 ms
+[22:30:33 INF] (c3722e1943f34db0) HTTP GET /api/v1/users responded 200 in 76.4933 ms
+[22:30:59 INF] (dc3397f485bc4e76) HTTP GET /Account/Login responded 200 in 5.1583 ms
+[22:30:59 INF] (97ca3368e0da4083) HTTP GET /api/v1/users responded 200 in 3.6190 ms
+[22:30:59 INF] (27b986ac0b89486e) HTTP GET /api/v1/users/3383856b-6ded-4167-9f1c-c2ca115df76b/scope responded 200 in 79.6272 ms
+[22:30:59 INF] (9709baff862744b1) HTTP GET /api/v1/users/bede69c7-93e7-4a12-8db6-ee38b50cc68a/scope responded 200 in 7.6398 ms
+[22:30:59 INF] (89cfdf8d5a364750) HTTP GET /api/v1/users/af873352-af25-436c-9d6d-88c5cd470a26/scope responded 200 in 3.9069 ms
+[22:31:09 INF] (6a073a25ce5c4867) HTTP GET /Account/Login responded 200 in 0.8091 ms
+[22:31:09 INF] (9c9625f9943344b6) HTTP GET /DataScope responded 302 in 3.4276 ms
+[22:31:09 INF] (f1826c75d65b48e0) HTTP GET /Account/Login responded 200 in 5.0938 ms
+[22:31:09 INF] (3aedb5403641417d) HTTP GET /api/v1/users responded 200 in 2.6808 ms
+[22:31:09 INF] (9128a5a80a824d3a) HTTP GET /api/v1/orgs responded 200 in 9.4416 ms
+[22:31:09 INF] (5b51d82f6c024b94) HTTP GET /api/v1/users/3383856b-6ded-4167-9f1c-c2ca115df76b/scope/check responded 200 in 10.5888 ms
+[22:31:09 INF] (90d3f824c9dc4958) HTTP GET /api/v1/users/3383856b-6ded-4167-9f1c-c2ca115df76b/scope/check responded 200 in 2.2946 ms
+[22:31:21 INF] (dab557ceac744eab) HTTP GET /Account/Login responded 200 in 1.3344 ms
+[22:31:21 INF] (278637dfab704ba9) HTTP POST /Account/Login responded 302 in 22.3234 ms
+[22:31:21 INF] (aa2a60b6bb3f49f4) HTTP GET /DataScope responded 200 in 61.3493 ms
