@@ -417,3 +417,56 @@ public class UserTeamController(AppDbContext db, UserTeamService teams) : Contro
         return RedirectToAction(nameof(Index));
     }
 }
+
+// Phiên làm việc hiệu lực: SysSession / GlobSession (port từ iNOS.InBrand).
+[Authorize]
+public class SessionController(AppDbContext db, SessionService sessions) : Controller
+{
+    public async Task<IActionResult> Index()
+    {
+        var users = await db.Users.OrderBy(u => u.Email).ToListAsync();
+        var recent = await sessions.RecentAsync(50);
+        var userById = users.ToDictionary(u => u.Id);
+
+        // Ảnh chụp phiên hiệu lực của từng người dùng (module/chức năng + bối cảnh đơn vị).
+        var snapshots = new Dictionary<Guid, SessionSnapshot>();
+        foreach (var u in users)
+        {
+            var snap = await sessions.BuildAsync(u.Id);
+            if (snap != null) snapshots[u.Id] = snap;
+        }
+
+        ViewBag.Users = users;
+        ViewBag.UserById = userById;
+        ViewBag.Snapshots = snapshots;
+        return View(recent);
+    }
+
+    // Tạo 1 phiên cho người dùng (↔ GlobSessionManager.Add).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(Guid userId)
+    {
+        var s = await sessions.CreateAsync(userId);
+        if (s == null) TempData["Error"] = "Không tìm thấy người dùng.";
+        else TempData["Success"] = $"Đã tạo phiên {s.SessionId[..8]}…";
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Kết thúc 1 phiên (↔ đăng xuất).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> End(string sessionId)
+    {
+        if (await sessions.EndAsync(sessionId)) TempData["Success"] = "Đã kết thúc phiên.";
+        else TempData["Error"] = "Không tìm thấy phiên.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Kết thúc mọi phiên đang hoạt động của 1 người dùng (↔ SysUserLogOutX).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> EndAll(Guid userId)
+    {
+        var n = await sessions.EndAllForUserAsync(userId);
+        TempData["Success"] = $"Đã kết thúc {n} phiên.";
+        return RedirectToAction(nameof(Index));
+    }
+}

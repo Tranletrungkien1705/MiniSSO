@@ -292,3 +292,25 @@ public class UserTeam
     public bool IsActive { get; set; } = true;     // Sys_UserTeam.FlagActive
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+
+// ── Phiên làm việc hiệu lực: SysSession / GlobSession (port từ iNOS.InBrand) ──
+// iNOS tạo 1 "phiên" (GlobSession) khi đăng nhập, rồi GlobSessionManager.GetFullPermission dựng
+// SysSession = ảnh chụp quyền hiệu lực của người dùng: IsSysAdmin + SysUser + danh sách Module
+// (kèm Function) + bối cảnh đơn vị (DLName) / kho (InvCode). SysSession có HasModule(code) /
+// HasFunction(code) để màn hình kiểm tra nhanh quyền. MiniSSO trước đây chỉ có các mảnh rời
+// (RbacService, ModuleService, DataScopeService) nhưng KHÔNG có 1 đối tượng "phiên" gộp lại.
+
+/// <summary>Phiên làm việc (tương ứng GlobSession): 1 lần đăng nhập của người dùng, có mã phiên.</summary>
+public class UserSession
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string SessionId { get; set; } = "";    // mã phiên (GlobSession.SessionId) — duy nhất
+    public Guid UserId { get; set; }                // người dùng sở hữu phiên (GlobSession.UserId)
+    public bool IsSysAdmin { get; set; }            // SysSession.IsSysAdmin — chụp tại thời điểm tạo
+    public Guid? OrgId { get; set; }                // bối cảnh đơn vị (SysSession.DLName ↔ SysUser.DLCode)
+    public string? OrgName { get; set; }            // tên đơn vị hiển thị (SysSession.DLName)
+    public string? InvCode { get; set; }            // bối cảnh kho (SysSession.InvCode)
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ExpiresAt { get; set; }        // hết hạn phiên (null = không giới hạn)
+    public bool IsActive { get; set; } = true;      // phiên còn hiệu lực (đăng xuất → false)
+}

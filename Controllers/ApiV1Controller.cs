@@ -13,7 +13,7 @@ namespace MiniSSO.Controllers;
 [ApiController]
 [Route("api/v1")]
 [Produces("application/json")]
-public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security, DataScopeService scope, ModuleService modules, ViewGroupService viewGroups, UserTeamService teams) : ControllerBase
+public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security, DataScopeService scope, ModuleService modules, ViewGroupService viewGroups, UserTeamService teams, SessionService sessions) : ControllerBase
 {
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard()
@@ -490,6 +490,53 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
     public async Task<IActionResult> DeleteUserTeam(Guid id)
     {
         if (!await teams.DeleteAsync(id)) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new { ok = true });
+    }
+
+    // ── Phiên làm việc hiệu lực: SysSession / GlobSession (port từ iNOS.InBrand) ──
+    // Ảnh chụp quyền hiệu lực của người dùng (IsSysAdmin + module/chức năng + bối cảnh đơn vị/kho).
+    [HttpGet("users/{id:guid}/session")]
+    public async Task<IActionResult> UserSession(Guid id, SessionService sessions)
+    {
+        var snap = await sessions.BuildAsync(id);
+        if (snap == null) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new
+        {
+            userId = snap.UserId, snap.Email, snap.FullName, snap.IsSysAdmin,
+            snap.OrgId, snap.OrgName, snap.InvCode,
+            modules = snap.ModuleCodes, functions = snap.FunctionCodes
+        });
+    }
+
+    // Tạo + lưu 1 phiên (↔ GlobSessionManager.Add) — chụp quyền hiệu lực tại thời điểm tạo.
+    [HttpPost("users/{id:guid}/session")]
+    public async Task<IActionResult> CreateUserSession(Guid id, [FromQuery] int? ttlMinutes)
+    {
+        var ttl = ttlMinutes == null ? (TimeSpan?)null : TimeSpan.FromMinutes(Math.Clamp(ttlMinutes.Value, 1, 1440));
+        var s = await sessions.CreateAsync(id, ttl);
+        if (s == null) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new { sessionId = s.SessionId, s.UserId, s.IsSysAdmin, s.OrgId, s.OrgName, s.InvCode, s.CreatedAt, s.ExpiresAt });
+    }
+
+    // Kiểm tra phiên có quyền với module/chức năng (↔ SysSession.HasModule/HasFunction).
+    [HttpGet("users/{id:guid}/session/check")]
+    public async Task<IActionResult> CheckSession(Guid id, [FromQuery] string? module, [FromQuery] string? function)
+    {
+        if (!await db.Users.AnyAsync(u => u.Id == id)) return NotFound(new { error = "Không tìm thấy." });
+        var res = await sessions.CheckAsync(id, module, function);
+        return Ok(new { userId = id, module, function, allowed = res.Allowed, reason = res.Reason });
+    }
+
+    // Danh sách phiên gần đây (mới nhất trước) — phục vụ màn hình quản trị.
+    [HttpGet("sessions")]
+    public async Task<IActionResult> Sessions([FromQuery] int take = 100)
+        => Ok((await sessions.RecentAsync(take)).Select(s => new { s.SessionId, s.UserId, s.IsSysAdmin, s.OrgId, s.OrgName, s.InvCode, s.CreatedAt, s.ExpiresAt, s.IsActive }));
+
+    // Kết thúc 1 phiên (↔ đăng xuất).
+    [HttpPost("sessions/{sessionId}/end")]
+    public async Task<IActionResult> EndSession(string sessionId)
+    {
+        if (!await sessions.EndAsync(sessionId)) return NotFound(new { error = "Không tìm thấy." });
         return Ok(new { ok = true });
     }
 

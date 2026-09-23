@@ -25,6 +25,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ViewGroupView> ViewGroupViews => Set<ViewGroupView>();
     public DbSet<ViewColumnInGroup> ViewColumnInGroups => Set<ViewColumnInGroup>();
     public DbSet<UserTeam> UserTeams => Set<UserTeam>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -47,5 +48,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<ViewGroupView>(e => e.HasIndex(x => x.Code).IsUnique());
         b.Entity<ViewColumnInGroup>(e => e.HasIndex(x => new { x.GroupViewId, x.ColumnViewId }).IsUnique());
         b.Entity<UserTeam>(e => { e.HasIndex(x => x.Code).IsUnique(); e.HasIndex(x => x.OrgId); });
+        b.Entity<UserSession>(e => { e.HasIndex(x => x.SessionId).IsUnique(); e.HasIndex(x => x.UserId); });
     }
 }
