@@ -762,6 +762,19 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         return Ok(users.Select(u => new { u.Id, u.Email, u.FullName, u.IsActive, u.IsSysAdmin, u.OrgId }));
     }
 
+    // ── Tự đăng ký tham gia hệ thống (port từ iNOS.InBrand: AccountController.Join +
+    //    AccountService.Register + SysUserManager.Register → SysUserAddX_New20190917) ──
+    // Người dùng tự hoàn tất hồ sơ để trở thành người dùng hệ thống: email PHẢI CHƯA tồn tại
+    // (↔ SysUserCheckDB FlagInactive), mật khẩu bắt buộc & đủ độ dài, đơn vị (nếu có) phải tồn tại
+    // & đang hoạt động (↔ MstDealerCheckDB). Tài khoản tạo ra ở trạng thái hoạt động, không bị khoá.
+    [HttpPost("register")]
+    public async Task<IActionResult> Register([FromBody] RegisterReq r, RegistrationService registration)
+    {
+        var res = await registration.RegisterAsync(r.Email, r.Password, r.FullName, r.PhoneNo, r.OrgId);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
+        return Ok(new { ok = true, id = res.UserId });
+    }
+
     // Thông tin OIDC discovery (để SPA hiển thị hướng dẫn tích hợp).
     [HttpGet("oidc-info")]
     public IActionResult OidcInfo()
@@ -802,3 +815,5 @@ public class ViewGroupColumnsReq { public List<string>? ColumnCodes { get; set; 
 public class UserTeamReq { public string Code { get; set; } = ""; public string? Name { get; set; } public Guid? OrgId { get; set; } }
 // Nhập hàng loạt nhóm từ file (↔ SysGroupController.Import). Content = nội dung CSV (Code,DLCode,Description).
 public class GroupImportReq { public string? Content { get; set; } }
+// Tự đăng ký tham gia hệ thống (↔ AccountController.Join + SysUserManager.Register).
+public class RegisterReq { public string? Email { get; set; } public string? Password { get; set; } public string? FullName { get; set; } public string? PhoneNo { get; set; } public Guid? OrgId { get; set; } }

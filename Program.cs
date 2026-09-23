@@ -40,6 +40,7 @@ builder.Services.AddScoped<GroupImportService>();
 builder.Services.AddScoped<GroupExportService>();
 builder.Services.AddScoped<SearchService>();
 builder.Services.AddScoped<UserQueryService>();
+builder.Services.AddScoped<RegistrationService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(o => { o.LoginPath = "/Account/Login"; o.Cookie.Name = "minisso.sid"; });
 builder.Services.AddAuthorization();

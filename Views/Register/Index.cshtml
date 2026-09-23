@@ -1,0 +1,47 @@
+@{
+    ViewData["Title"] = "Tự đăng ký tham gia";
+    var orgs = (List<Org>)ViewBag.Orgs;
+    var minLen = (int)ViewBag.MinPasswordLength;
+}
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Đăng ký người dùng mới</h6>
+            <form asp-action="Register" method="post">@Html.AntiForgeryToken()
+                <div class="mb-2"><input name="email" type="email" class="form-control" placeholder="Email đăng ký *" required /></div>
+                <div class="mb-2"><input name="fullName" class="form-control" placeholder="Họ và tên" /></div>
+                <div class="mb-2"><input name="phoneNo" class="form-control" placeholder="Số điện thoại" /></div>
+                <div class="mb-2"><input name="password" type="password" class="form-control" placeholder="Mật khẩu * (tối thiểu @minLen ký tự)" required /></div>
+                <div class="mb-3">
+                    <select name="orgId" class="form-select">
+                        <option value="">— Không gắn đơn vị —</option>
+                        @foreach (var o in orgs)
+                        {
+                            <option value="@o.Id">@o.BuCode · @o.Name</option>
+                        }
+                    </select>
+                </div>
+                <button class="btn btn-primary w-100"><i class="bi bi-person-plus me-1"></i>Đăng ký</button>
+            </form>
+            <p class="text-muted small mt-3 mb-0">
+                Mô hình port từ iNOS.InBrand: <code>AccountController.Join</code> → <code>AccountService.Register</code>
+                → <code>SysUserManager.Register</code> (<code>SysUserAddX_New20190917</code>). Email phải <b>chưa tồn tại</b>
+                (↔ <code>SysUserCheckDB</code>), đơn vị (nếu có) phải tồn tại &amp; đang hoạt động (↔ <code>MstDealerCheckDB</code>).
+                Tài khoản tạo ra ở trạng thái <b>hoạt động</b>, không bị khoá, ngôn ngữ mặc định <code>vi</code>.
+            </p>
+        </div></div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Quy tắc đăng ký (theo iNOS)</h6>
+            <ul class="mb-0 small text-muted">
+                <li>Email (Code) bắt buộc và <b>phải chưa tồn tại</b> trong hệ thống.</li>
+                <li>Mật khẩu bắt buộc, tối thiểu <b>@minLen ký tự</b>; được băm trước khi lưu.</li>
+                <li>Họ tên / số điện thoại được <b>Trim</b> trước khi lưu.</li>
+                <li>Đơn vị tổ chức (nếu chọn) phải tồn tại và đang hoạt động.</li>
+                <li>Tài khoản tạo ra: <code>Enable = true</code>, <code>Lockout = false</code>, <code>Language = "vi"</code>.</li>
+            </ul>
+        </div></div>
+    </div>
+</div>

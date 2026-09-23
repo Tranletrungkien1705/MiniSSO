@@ -12,6 +12,12 @@ public class AppUser
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // ── Hồ sơ tự đăng ký (port từ iNOS.InBrand SysUser: PhoneNo / Language) ──
+    // iNOS lưu số điện thoại (SysUser.PhoneNo) và ngôn ngữ (SysUser.Language, mặc định "vi") khi
+    // người dùng tự đăng ký tham gia hệ thống (AccountController.Join → SysUserManager.Register).
+    public string? PhoneNo { get; set; }           // SysUser.PhoneNo
+    public string Language { get; set; } = "vi";   // SysUser.Language — mặc định "vi" khi đăng ký
+
     // ── Bảo mật tài khoản (port từ iNOS.InBrand SysUser: Enable / Lockout / LockoutDate / VerificationCode) ──
     // iNOS tách "Enable" (bị vô hiệu hoá) khỏi "Lockout" (bị khoá do đăng nhập sai nhiều lần).
     // MiniSSO trước đây chỉ có IsActive; bổ sung đếm số lần đăng nhập sai + tự khoá tạm thời.

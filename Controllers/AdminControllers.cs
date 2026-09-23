@@ -693,3 +693,26 @@ public class GroupModuleController(AppDbContext db, ModuleService modules) : Con
         return RedirectToAction(nameof(Index), new { groupId });
     }
 }
+
+// Tự đăng ký tham gia hệ thống (port từ iNOS.InBrand: AccountController.Join + SysUserManager.Register).
+// Người dùng tự hoàn tất hồ sơ để trở thành người dùng hệ thống: email PHẢI CHƯA tồn tại,
+// mật khẩu bắt buộc & đủ độ dài, đơn vị (nếu có) phải tồn tại & đang hoạt động.
+[Authorize]
+public class RegisterController(AppDbContext db, RegistrationService registration) : Controller
+{
+    public async Task<IActionResult> Index()
+    {
+        ViewBag.Orgs = await db.Orgs.OrderBy(o => o.BuCode).ToListAsync();
+        ViewBag.MinPasswordLength = RegistrationService.MinPasswordLength;
+        return View();
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Register(string email, string password, string? fullName, string? phoneNo, Guid? orgId)
+    {
+        var res = await registration.RegisterAsync(email, password, fullName, phoneNo, orgId);
+        if (!res.Ok) TempData["Error"] = res.Error;
+        else TempData["Success"] = $"Đã đăng ký người dùng '{email}'.";
+        return RedirectToAction(nameof(Index));
+    }
+}
