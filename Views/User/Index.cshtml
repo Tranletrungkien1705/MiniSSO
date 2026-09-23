@@ -1,5 +1,9 @@
 @model List<AppUser>
-@{ ViewData["Title"] = "Người dùng"; }
+@{
+    ViewData["Title"] = "Người dùng";
+    var orgs = (List<Org>)ViewBag.Orgs;
+    var orgById = orgs.ToDictionary(o => o.Id, o => o);
+}
 <div class="row g-3">
     <div class="col-lg-4"><div class="card"><div class="card-body">
         <h6 class="fw-bold mb-3">Thêm người dùng</h6>
@@ -30,6 +34,7 @@
                     else { <span class="text-muted">—</span> }
                 </td>
                 <td class="text-nowrap">
+                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#edit-@u.Id">Sửa</button>
                     <form asp-action="Toggle" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@u.Id" /><button class="btn btn-sm btn-outline-secondary">@(u.IsActive ? "Khóa" : "Mở")</button></form>
                     @if (u.IsLockedOut)
                     {
@@ -42,6 +47,51 @@
                     <form asp-action="ResetPassword" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@u.Id" /><input name="newPassword" type="text" class="form-control form-control-sm d-inline-block" style="width:120px" placeholder="Mật khẩu mới" /><button class="btn btn-sm btn-outline-primary">Đặt lại</button></form>
                 </td>
             </tr>
+            <tr class="collapse" id="edit-@u.Id"><td colspan="7" class="bg-light">
+                <form asp-action="Update" method="post">@Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@u.Id" />
+                    <div class="small text-muted mb-2">Cập nhật hồ sơ theo <b>cột cho phép</b> (port từ iNOS <code>SysUserUpdateX</code> / <code>Ft_Cols_Upd</code>): chỉ các cột được tích mới ghi, cột khác giữ nguyên.</div>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-check"><input type="checkbox" name="columns" value="Email" class="form-check-input" /> <span class="form-check-label">Email</span></label>
+                            <input name="email" type="email" class="form-control form-control-sm" value="@u.Email" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-check"><input type="checkbox" name="columns" value="FullName" class="form-check-input" /> <span class="form-check-label">Họ tên</span></label>
+                            <input name="fullName" class="form-control form-control-sm" value="@u.FullName" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-check"><input type="checkbox" name="columns" value="Roles" class="form-check-input" /> <span class="form-check-label">Vai trò (csv)</span></label>
+                            <input name="roles" class="form-control form-control-sm" value="@u.Roles" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-check"><input type="checkbox" name="columns" value="Tenant" class="form-check-input" /> <span class="form-check-label">Tổ chức</span></label>
+                            <input name="tenant" class="form-control form-control-sm" value="@u.Tenant" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-check"><input type="checkbox" name="columns" value="OrgId" class="form-check-input" /> <span class="form-check-label">Đơn vị</span></label>
+                            <select name="orgId" class="form-select form-select-sm">
+                                <option value="">— Không gắn đơn vị —</option>
+                                @foreach (var o in orgs)
+                                {
+                                    <option value="@o.Id" selected="@(u.OrgId == o.Id)">@o.BuCode · @o.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-check"><input type="checkbox" name="columns" value="IsActive" class="form-check-input" /> <span class="form-check-label">Hoạt động</span></label>
+                            <div><input type="checkbox" name="isActive" value="true" class="form-check-input" checked="@u.IsActive" /></div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-check"><input type="checkbox" name="columns" value="IsSysAdmin" class="form-check-input" /> <span class="form-check-label">SysAdmin</span></label>
+                            <div><input type="checkbox" name="isSysAdmin" value="true" class="form-check-input" checked="@u.IsSysAdmin" /></div>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-sm btn-primary w-100"><i class="bi bi-save me-1"></i>Lưu hồ sơ</button>
+                        </div>
+                    </div>
+                </form>
+            </td></tr>
         }
         </tbody></table>
     </div></div></div>

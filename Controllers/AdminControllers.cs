@@ -8,9 +8,25 @@ using MiniSSO.Services;
 namespace MiniSSO.Controllers;
 
 [Authorize]
-public class UserController(AppDbContext db, AccountSecurityService security) : Controller
+public class UserController(AppDbContext db, AccountSecurityService security, UserProfileService profiles) : Controller
 {
-    public async Task<IActionResult> Index() => View(await db.Users.OrderBy(u => u.Email).ToListAsync());
+    public async Task<IActionResult> Index()
+    {
+        ViewBag.Orgs = await db.Orgs.OrderBy(o => o.BuCode).ToListAsync();
+        return View(await db.Users.OrderBy(u => u.Email).ToListAsync());
+    }
+
+    // Cập nhật hồ sơ theo DANH SÁCH CỘT CHO PHÉP (port từ iNOS.InBrand: SysUserUpdateX / Ft_Cols_Upd).
+    // Form gửi kèm các cột người dùng chọn sửa; chỉ những cột đó được ghi, cột khác giữ nguyên.
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Update(Guid id, string? email, string? fullName, string? roles, string? tenant,
+        bool isActive, bool isSysAdmin, Guid? orgId, string[]? columns)
+    {
+        var patch = new UserProfilePatch(email, fullName, roles, tenant, isActive, isSysAdmin, orgId);
+        var res = await profiles.UpdateAsync(id, patch, columns);
+        if (!res.Ok) TempData["Error"] = res.Error; else TempData["Success"] = "Đã cập nhật hồ sơ người dùng.";
+        return RedirectToAction(nameof(Index));
+    }
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(string email, string fullName, string password, string? roles, string? tenant)

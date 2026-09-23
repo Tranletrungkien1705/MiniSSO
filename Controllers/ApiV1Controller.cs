@@ -58,6 +58,18 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         return Ok(new { ok = true, isActive = u.IsActive });
     }
 
+    // Cập nhật hồ sơ người dùng theo DANH SÁCH CỘT CHO PHÉP (port từ iNOS.InBrand:
+    // SysUserManager.SysUserUpdateX — mẫu "Ft_Cols_Upd"). Chỉ các cột có tên trong `columns`
+    // mới được ghi; các cột khác giữ nguyên. `columns` rỗng/null = cập nhật tất cả cột cho phép.
+    [HttpPut("users/{id:guid}")]
+    public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UserUpdateReq r, UserProfileService profiles)
+    {
+        var patch = new UserProfilePatch(r.Email, r.FullName, r.Roles, r.Tenant, r.IsActive, r.IsSysAdmin, r.OrgId);
+        var res = await profiles.UpdateAsync(id, patch, r.Columns);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
+        return Ok(new { ok = true });
+    }
+
     // ── Bảo mật tài khoản (port từ iNOS.InBrand SysUser: Lockout / LockoutDate / ResetPass) ──
     // Khoá/mở khoá tài khoản thủ công (admin) — tương ứng SysUser.Lockout.
     [HttpPost("users/{id:guid}/lock")]
@@ -644,6 +656,8 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
 public record DashDto(int Users, int ActiveUsers, int Clients, int ActiveTokens, string Issuer);
 
 public class UserReq { public string Email { get; set; } = ""; public string Password { get; set; } = ""; public string? FullName { get; set; } public string? Roles { get; set; } public string? Tenant { get; set; } }
+// Cập nhật hồ sơ theo cột cho phép (↔ SysUserUpdateX / Ft_Cols_Upd). Columns = danh sách cột được ghi.
+public class UserUpdateReq { public string? Email { get; set; } public string? FullName { get; set; } public string? Roles { get; set; } public string? Tenant { get; set; } public bool IsActive { get; set; } = true; public bool IsSysAdmin { get; set; } public Guid? OrgId { get; set; } public List<string>? Columns { get; set; } }
 public class ClientReq { public string ClientId { get; set; } = ""; public string? Name { get; set; } public string? RedirectUris { get; set; } public string? Grants { get; set; } public string? Scopes { get; set; } public string? Secret { get; set; } public bool RequirePkce { get; set; } = true; }
 public class LicenseCheckReq { public string? LicenseKey { get; set; } public string? AppSlug { get; set; } public string? InstanceHost { get; set; } }
 public class GroupReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Description { get; set; } }
