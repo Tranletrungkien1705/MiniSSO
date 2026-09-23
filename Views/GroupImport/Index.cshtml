@@ -1,0 +1,49 @@
+@{
+    ViewData["Title"] = "Nhập nhóm từ file";
+    var groups = (List<Group>)ViewBag.Groups;
+}
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Nhập danh sách nhóm từ file</h6>
+            <form asp-action="Import" method="post">@Html.AntiForgeryToken()
+                <div class="mb-2">
+                    <label class="form-label small text-muted">Nội dung file (CSV) — mỗi dòng: <code>Code,DLCode,Description</code></label>
+                    <textarea name="content" class="form-control" rows="8" placeholder="Code,DLCode,Description&#10;GRP_HN1,10,Nhóm kinh doanh Hà Nội&#10;GRP_HCM,21,Nhóm kinh doanh HCM"></textarea>
+                </div>
+                <button class="btn btn-primary w-100"><i class="bi bi-upload me-1"></i>Nhập nhóm</button>
+            </form>
+            <p class="text-muted small mt-3 mb-0">
+                Mô hình port từ iNOS.InBrand: <code>SysGroupController.Import</code>. Kiểm tra toàn bộ file
+                <b>trước khi ghi</b>: đúng 3 cột, mã/đơn vị/mô tả không rỗng, mô tả ≤ 400 ký tự, mã không lặp trong file.
+                Dòng đầu là tiêu đề (bỏ qua). <code>DLCode</code> khớp <code>Org.Code</code>; không khớp thì nhóm để toàn cục.
+            </p>
+        </div></div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Nhóm hiện có (@groups.Count)</h6>
+            @if (groups.Count == 0)
+            {
+                <p class="text-muted mb-0">Chưa có nhóm nào.</p>
+            }
+            else
+            {
+                <table class="table align-middle mb-0">
+                    <thead><tr><th>Mã nhóm</th><th>Mô tả</th><th>Trạng thái</th></tr></thead>
+                    <tbody>
+                    @foreach (var g in groups)
+                    {
+                        <tr>
+                            <td><code>@g.Code</code></td>
+                            <td class="text-muted small">@(string.IsNullOrWhiteSpace(g.Description) ? "—" : g.Description)</td>
+                            <td>@if (g.IsActive) { <span class="badge bg-success">bật</span> } else { <span class="badge bg-secondary">khóa</span> }</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div></div>
+    </div>
+</div>

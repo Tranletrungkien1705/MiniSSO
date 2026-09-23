@@ -36,6 +36,7 @@ builder.Services.AddScoped<CheckDbService>();
 builder.Services.AddScoped<UserProfileService>();
 builder.Services.AddScoped<GroupProfileService>();
 builder.Services.AddScoped<UserDeleteService>();
+builder.Services.AddScoped<GroupImportService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(o => { o.LoginPath = "/Account/Login"; o.Cookie.Name = "minisso.sid"; });
 builder.Services.AddAuthorization();

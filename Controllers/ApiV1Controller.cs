@@ -298,6 +298,16 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         return Ok(new { ok = true });
     }
 
+    // Nhập hàng loạt nhóm từ file (port từ iNOS.InBrand: SysGroupController.Import).
+    // Kiểm tra toàn bộ file trước khi ghi: đúng số cột, không rỗng, mô tả ≤ 400 ký tự, mã không lặp.
+    [HttpPost("groups/import")]
+    public async Task<IActionResult> ImportGroups([FromBody] GroupImportReq r, GroupImportService importer)
+    {
+        var res = await importer.ImportCsvAsync(r.Content);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
+        return Ok(new { ok = true, imported = res.Imported });
+    }
+
     // ── Truy vấn thành viên nhóm (port từ iNOS.InBrand: SysUserProvider.GetAllUserByGroupCode /
     //    GetAllUserNotInGroup + SysUserInGroupProvider.RemoveByUser) ──
     // Danh sách người dùng đang thuộc 1 nhóm (↔ GetAllUserByGroupCode).
@@ -710,3 +720,5 @@ public class ViewColumnReq { public string Code { get; set; } = ""; public strin
 public class ViewGroupReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Remark { get; set; } }
 public class ViewGroupColumnsReq { public List<string>? ColumnCodes { get; set; } }
 public class UserTeamReq { public string Code { get; set; } = ""; public string? Name { get; set; } public Guid? OrgId { get; set; } }
+// Nhập hàng loạt nhóm từ file (↔ SysGroupController.Import). Content = nội dung CSV (Code,DLCode,Description).
+public class GroupImportReq { public string? Content { get; set; } }

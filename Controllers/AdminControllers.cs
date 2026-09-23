@@ -565,6 +565,29 @@ public class GroupMemberController(AppDbContext db, GroupService groups) : Contr
     }
 }
 
+// Nhập hàng loạt nhóm từ file (port từ iNOS.InBrand: SysGroupController.Import).
+// iNOS đọc file Excel (từ ô A2) và kiểm tra toàn bộ trước khi ghi: đúng số cột, không rỗng,
+// mô tả ≤ 400 ký tự, mã không lặp trong file. MiniSSO dùng CSV (không kèm thư viện Excel) —
+// quy tắc nghiệp vụ giữ nguyên, chỉ khác định dạng đầu vào.
+[Authorize]
+public class GroupImportController(AppDbContext db, GroupImportService importer) : Controller
+{
+    public async Task<IActionResult> Index()
+    {
+        ViewBag.Groups = await db.Groups.OrderBy(g => g.Code).ToListAsync();
+        return View();
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Import(string? content)
+    {
+        var res = await importer.ImportCsvAsync(content);
+        if (!res.Ok) TempData["Error"] = res.Error;
+        else TempData["Success"] = $"Đã nhập {res.Imported} nhóm từ file.";
+        return RedirectToAction(nameof(Index));
+    }
+}
+
 // Gán module trực tiếp cho nhóm (port từ iNOS.InBrand: Sys_Access = GroupCode + ModuleCode).
 // Màn hình "Gán module vào nhóm" của iNOS (SysGroupController.GetSysModule) liệt kê TẤT CẢ module
 // kèm cờ "đã gán cho nhóm này chưa" (SysAccessService.GetAllAccessByGroupCode); SaveModuleInGroup →
