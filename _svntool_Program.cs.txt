@@ -1,0 +1,22 @@
+using Microsoft.Data.Sqlite;
+var db = args[0];
+var prefix = args.Length > 1 ? args[1] : "";
+var pristine = args.Length > 2 ? args[2] : "";
+using var c = new SqliteConnection($"Data Source={db};Mode=ReadOnly");
+c.Open();
+var cmd = c.CreateCommand();
+cmd.CommandText = "SELECT local_relpath, checksum FROM NODES WHERE kind='file'";
+using var r = cmd.ExecuteReader();
+while (r.Read())
+{
+    var p = r.IsDBNull(0) ? "" : r.GetString(0);
+    var ck = r.IsDBNull(1) ? "" : r.GetString(1);
+    if (p.Equals(prefix, StringComparison.OrdinalIgnoreCase))
+    {
+        var h = ck.LastIndexOf('$');
+        var sha = ck.Substring(h + 1);
+        var path = pristine.TrimEnd('/') + "/" + sha.Substring(0, 2) + "/" + sha.Substring(2) + ".svn-base";
+        if (File.Exists(path)) Console.Write(File.ReadAllText(path));
+        else Console.Error.WriteLine("NOT FOUND: " + path);
+    }
+}
