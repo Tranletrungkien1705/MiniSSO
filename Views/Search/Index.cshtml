@@ -1,0 +1,141 @@
+@{
+    ViewData["Title"] = "Tìm kiếm phân trang";
+    var users = (List<AppUser>)ViewBag.Users;
+    var caller = (AppUser?)ViewBag.Caller;
+    var q = (string)ViewBag.Q;
+    var active = (bool?)ViewBag.Active;
+    var kind = (string)ViewBag.Kind;
+    var userResult = ViewBag.UserResult as PagedResult<UserSearchRow>;
+    var groupResult = ViewBag.GroupResult as PagedResult<Group>;
+    var page = userResult?.PageIndex ?? groupResult?.PageIndex ?? 0;
+    var pageCount = userResult?.PageCount ?? groupResult?.PageCount ?? 0;
+    var total = userResult?.Total ?? groupResult?.Total ?? 0;
+}
+<div class="card mb-3"><div class="card-body">
+    <h6 class="fw-bold mb-3">Tìm kiếm có phân trang + lọc phạm vi dữ liệu</h6>
+    <p class="text-muted small mb-3">
+        Port từ iNOS.InBrand: <code>SysUserManager.Search</code> / <code>SysGroupManager.Search</code>.
+        Kết quả bị lọc theo phạm vi dữ liệu của <b>người gọi</b> (SysAdmin hoặc ở nút gốc → thấy tất cả;
+        ngược lại chỉ thấy bản ghi thuộc nhánh đơn vị của họ). Tìm người dùng còn gắn kèm danh sách nhóm.
+    </p>
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small mb-1">Người gọi (phạm vi)</label>
+            <select name="callerId" class="form-select form-select-sm">
+                @foreach (var u in users)
+                {
+                    <option value="@u.Id" selected="@(caller != null && caller.Id == u.Id)">
+                        @u.Email @(u.IsSysAdmin ? " (SysAdmin)" : "")
+                    </option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small mb-1">Tìm theo</label>
+            <select name="kind" class="form-select form-select-sm">
+                <option value="users" selected="@(kind == "users")">Người dùng</option>
+                <option value="groups" selected="@(kind == "groups")">Nhóm</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small mb-1">Từ khoá (email/tên hoặc mã/tên)</label>
+            <input name="q" value="@q" class="form-control form-control-sm" placeholder="vd: sales" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small mb-1">Trạng thái</label>
+            <select name="active" class="form-select form-select-sm">
+                <option value="" selected="@(active == null)">Tất cả</option>
+                <option value="true" selected="@(active == true)">Đang hoạt động</option>
+                <option value="false" selected="@(active == false)">Đã khoá</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-primary btn-sm w-100"><i class="bi bi-search me-1"></i>Tìm</button>
+        </div>
+    </form>
+</div></div>
+
+@if (caller == null)
+{
+    <div class="card"><div class="card-body"><p class="text-muted mb-0">Chưa có người dùng nào để chọn làm người gọi.</p></div></div>
+}
+else
+{
+    <div class="card"><div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0">
+                @(kind == "groups" ? "Nhóm" : "Người dùng") — @total kết quả
+                <span class="text-muted small">(trang @(page + 1)/@(Math.Max(pageCount, 1)))</span>
+            </h6>
+            <span class="text-muted small">Người gọi: <code>@caller.Email</code>@(caller.IsSysAdmin ? " · SysAdmin (không giới hạn)" : "")</span>
+        </div>
+
+        @if (kind == "groups")
+        {
+            var items = groupResult?.Items ?? new List<Group>();
+            if (items.Count == 0)
+            {
+                <p class="text-muted mb-0">Không có nhóm nào khớp.</p>
+            }
+            else
+            {
+                <table class="table align-middle mb-0">
+                    <thead><tr><th>Mã</th><th>Tên</th><th>Đơn vị</th><th>Trạng thái</th></tr></thead>
+                    <tbody>
+                    @foreach (var g in items)
+                    {
+                        <tr>
+                            <td><code>@g.Code</code></td>
+                            <td>@g.Name</td>
+                            <td class="text-muted small">@(g.OrgId == null ? "Toàn cục" : g.OrgId.ToString())</td>
+                            <td>@if (g.IsActive) { <span class="badge bg-success">bật</span> } else { <span class="badge bg-secondary">khóa</span> }</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        }
+        else
+        {
+            var items = userResult?.Items ?? new List<UserSearchRow>();
+            if (items.Count == 0)
+            {
+                <p class="text-muted mb-0">Không có người dùng nào khớp.</p>
+            }
+            else
+            {
+                <table class="table align-middle mb-0">
+                    <thead><tr><th>Email</th><th>Họ tên</th><th>Nhóm</th><th>Trạng thái</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in items)
+                    {
+                        <tr>
+                            <td>@r.User.Email</td>
+                            <td class="text-muted small">@r.User.FullName</td>
+                            <td>
+                                @if (r.Groups.Count == 0) { <span class="text-muted small">—</span> }
+                                else { @foreach (var g in r.Groups) { <span class="badge bg-light text-dark border me-1">@g.Code</span> } }
+                            </td>
+                            <td>@if (r.User.IsActive) { <span class="badge bg-success">bật</span> } else { <span class="badge bg-secondary">khóa</span> }</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        }
+
+        @if (pageCount > 1)
+        {
+            <nav class="mt-3">
+                <ul class="pagination pagination-sm mb-0">
+                    @for (var p = 0; p < pageCount; p++)
+                    {
+                        <li class="page-item @(p == page ? "active" : "")">
+                            <a class="page-link" href="@Url.Action("Index", new { callerId = caller.Id, q, active, kind, page = p })">@(p + 1)</a>
+                        </li>
+                    }
+                </ul>
+            </nav>
+        }
+    </div></div>
+}

@@ -682,6 +682,43 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         return Ok(new { kind = k.ToString(), code, res.Ok, res.Exists, res.Status, res.Error });
     }
 
+    // ── Tìm kiếm có phân trang + lọc phạm vi dữ liệu (port từ iNOS.InBrand:
+    //    SysUserManager.Search + SysGroupManager.Search) ──
+    // iNOS trả về 1 TRANG kết quả (PageInfo) và chèn điều kiện phạm vi dữ liệu trước khi truy vấn:
+    // SysAdmin/nút gốc → không giới hạn; ngược lại → chỉ bản ghi thuộc đại lý trong phạm vi người gọi.
+    // Riêng tìm người dùng còn GẮN NHÓM cho từng người (item.Groups).
+    [HttpGet("search/users")]
+    public async Task<IActionResult> SearchUsers([FromQuery] Guid callerId, [FromQuery] string? q,
+        [FromQuery] bool? active, [FromQuery] int page = 0, [FromQuery] int pageSize = SearchService.DefaultPageSize,
+        [FromQuery] string orderBy = "email", SearchService search = null!)
+    {
+        if (!await db.Users.AnyAsync(u => u.Id == callerId)) return NotFound(new { error = "Không tìm thấy người gọi." });
+        var res = await search.SearchUsersAsync(callerId, q, active, page, pageSize, orderBy);
+        return Ok(new
+        {
+            res.Total, res.PageIndex, res.PageSize, res.PageCount,
+            items = res.Items.Select(r => new
+            {
+                r.User.Id, r.User.Email, r.User.FullName, r.User.IsActive, r.User.IsSysAdmin, r.User.OrgId,
+                groups = r.Groups.Select(g => new { g.Id, g.Code, g.Name })
+            })
+        });
+    }
+
+    [HttpGet("search/groups")]
+    public async Task<IActionResult> SearchGroups([FromQuery] Guid callerId, [FromQuery] string? q,
+        [FromQuery] bool? active, [FromQuery] int page = 0, [FromQuery] int pageSize = SearchService.DefaultPageSize,
+        [FromQuery] string orderBy = "code", SearchService search = null!)
+    {
+        if (!await db.Users.AnyAsync(u => u.Id == callerId)) return NotFound(new { error = "Không tìm thấy người gọi." });
+        var res = await search.SearchGroupsAsync(callerId, q, active, page, pageSize, orderBy);
+        return Ok(new
+        {
+            res.Total, res.PageIndex, res.PageSize, res.PageCount,
+            items = res.Items.Select(g => new { g.Id, g.Code, g.Name, g.Description, g.IsActive, g.OrgId })
+        });
+    }
+
     // Thông tin OIDC discovery (để SPA hiển thị hướng dẫn tích hợp).
     [HttpGet("oidc-info")]
     public IActionResult OidcInfo()

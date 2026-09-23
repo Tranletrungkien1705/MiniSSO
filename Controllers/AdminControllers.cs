@@ -588,6 +588,34 @@ public class GroupImportController(AppDbContext db, GroupImportService importer)
     }
 }
 
+// Tìm kiếm có phân trang + lọc phạm vi dữ liệu (port từ iNOS.InBrand:
+// SysUserManager.Search + SysGroupManager.Search). Màn hình cho chọn "người gọi" để thấy
+// kết quả bị lọc theo phạm vi dữ liệu của người đó (SysAdmin/nút gốc → thấy tất cả).
+[Authorize]
+public class SearchController(AppDbContext db, SearchService search) : Controller
+{
+    public async Task<IActionResult> Index(Guid? callerId, string? q, bool? active, int page = 0, string? kind = "users")
+    {
+        var users = await db.Users.OrderBy(u => u.Email).ToListAsync();
+        var caller = callerId != null ? users.FirstOrDefault(u => u.Id == callerId) : users.FirstOrDefault();
+
+        ViewBag.Users = users;
+        ViewBag.Caller = caller;
+        ViewBag.Q = q ?? "";
+        ViewBag.Active = active;
+        ViewBag.Kind = kind == "groups" ? "groups" : "users";
+
+        if (caller != null)
+        {
+            if (ViewBag.Kind == "groups")
+                ViewBag.GroupResult = await search.SearchGroupsAsync(caller.Id, q, active, page);
+            else
+                ViewBag.UserResult = await search.SearchUsersAsync(caller.Id, q, active, page);
+        }
+        return View();
+    }
+}
+
 // Gán module trực tiếp cho nhóm (port từ iNOS.InBrand: Sys_Access = GroupCode + ModuleCode).
 // Màn hình "Gán module vào nhóm" của iNOS (SysGroupController.GetSysModule) liệt kê TẤT CẢ module
 // kèm cờ "đã gán cho nhóm này chưa" (SysAccessService.GetAllAccessByGroupCode); SaveModuleInGroup →
