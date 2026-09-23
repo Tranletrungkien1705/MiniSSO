@@ -13,7 +13,7 @@ namespace MiniSSO.Controllers;
 [ApiController]
 [Route("api/v1")]
 [Produces("application/json")]
-public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security, DataScopeService scope, ModuleService modules, ViewGroupService viewGroups, UserTeamService teams, SessionService sessions) : ControllerBase
+public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security, DataScopeService scope, ModuleService modules, ViewGroupService viewGroups, UserTeamService teams, SessionService sessions, SelfServiceService selfService) : ControllerBase
 {
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard()
@@ -79,6 +79,16 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         if (string.IsNullOrWhiteSpace(r.NewPassword) || r.NewPassword.Length < 6)
             return BadRequest(new { error = "Mật khẩu mới phải từ 6 ký tự." });
         if (!await security.ResetPasswordAsync(id, r.NewPassword)) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new { ok = true });
+    }
+
+    // Tự đổi mật khẩu (port từ iNOS.InBrand: AccountController.ChangePassword + SysUserManager.ResetPassword).
+    // Người dùng tự đổi mật khẩu của chính mình: phải khớp mật khẩu hiện tại + xác nhận mật khẩu mới.
+    [HttpPost("users/{id:guid}/change-password")]
+    public async Task<IActionResult> ChangeOwnPassword(Guid id, [FromBody] ChangePasswordReq r)
+    {
+        var res = await selfService.ChangeOwnPasswordAsync(id, r.CurrentPassword, r.NewPassword, r.ConfirmPassword);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
         return Ok(new { ok = true });
     }
 
@@ -594,6 +604,7 @@ public class GroupAccessSetReq { public List<string>? ObjectCodes { get; set; } 
 public class OrgReq { public string Code { get; set; } = ""; public string? Name { get; set; } public Guid? ParentId { get; set; } public string? Remark { get; set; } }
 public class UserScopeReq { public bool IsSysAdmin { get; set; } public Guid? OrgId { get; set; } }
 public class ResetPasswordReq { public string NewPassword { get; set; } = ""; }
+public class ChangePasswordReq { public string? CurrentPassword { get; set; } public string? NewPassword { get; set; } public string? ConfirmPassword { get; set; } }
 public class ModuleReq { public string Code { get; set; } = ""; public string? Title { get; set; } public string? Description { get; set; } public string? ModuleType { get; set; } public Guid? ParentId { get; set; } public int SortOrder { get; set; } }
 public class ModuleFunctionsReq { public List<string>? FunctionCodes { get; set; } }
 public class ViewColumnReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Remark { get; set; } }

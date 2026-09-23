@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MiniSSO.Data;
@@ -8,7 +9,7 @@ using MiniSSO.Services;
 
 namespace MiniSSO.Controllers;
 
-public class AccountController(AccountSecurityService security) : Controller
+public class AccountController(AccountSecurityService security, SelfServiceService selfService) : Controller
 {
     [HttpGet]
     public IActionResult Login(string? returnUrl = null) { ViewBag.ReturnUrl = returnUrl; return View(); }
@@ -38,6 +39,23 @@ public class AccountController(AccountSecurityService security) : Controller
     {
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToAction("Login");
+    }
+
+    // Tự đổi mật khẩu (port từ iNOS.InBrand: AccountController.ChangePassword).
+    // Người dùng đang đăng nhập tự đổi mật khẩu của chính mình.
+    [Authorize]
+    [HttpGet]
+    public IActionResult ChangePassword() => View();
+
+    [Authorize]
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePassword(string currentPassword, string newPassword, string confirmPassword)
+    {
+        var uid = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var res = await selfService.ChangeOwnPasswordAsync(uid, currentPassword, newPassword, confirmPassword);
+        if (!res.Ok) { TempData["Error"] = res.Error; return RedirectToAction(nameof(ChangePassword)); }
+        TempData["Success"] = "Thay đổi mật khẩu thành công!";
+        return RedirectToAction(nameof(ChangePassword));
     }
 }
 
