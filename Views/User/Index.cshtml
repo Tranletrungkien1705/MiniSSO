@@ -45,6 +45,7 @@
                         <form asp-action="Lock" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@u.Id" /><button class="btn btn-sm btn-outline-danger">Khoá</button></form>
                     }
                     <form asp-action="ResetPassword" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@u.Id" /><input name="newPassword" type="text" class="form-control form-control-sm d-inline-block" style="width:120px" placeholder="Mật khẩu mới" /><button class="btn btn-sm btn-outline-primary">Đặt lại</button></form>
+                    <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Xoá người dùng @u.Email? Thao tác này cũng gỡ họ khỏi mọi nhóm.');">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@u.Id" /><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
                 </td>
             </tr>
             <tr class="collapse" id="edit-@u.Id"><td colspan="7" class="bg-light">

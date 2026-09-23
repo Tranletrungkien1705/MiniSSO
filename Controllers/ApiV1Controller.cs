@@ -326,6 +326,17 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         return Ok(new { ok = true, removed });
     }
 
+    // Xoá người dùng kèm dọn liên kết nhóm (port từ iNOS.InBrand: SysUserManager.Remove →
+    // SysUserDeleteX + SysUserInGroupProvider.RemoveByUser). Kiểm tra người dùng PHẢI tồn tại
+    // (↔ SysUserCheckDB với strFlagExistToCheck = "1"), gỡ khỏi mọi nhóm rồi xoá.
+    [HttpDelete("users/{id:guid}")]
+    public async Task<IActionResult> DeleteUser(Guid id, UserDeleteService userDelete)
+    {
+        var res = await userDelete.DeleteAsync(id);
+        if (!res.Ok) return NotFound(new { error = res.Error });
+        return Ok(new { ok = true, removedGroupLinks = res.RemovedGroupLinks });
+    }
+
     // ── Cây tổ chức (port từ iNOS.InBrand: Mst_Org) ──
     [HttpGet("orgs")]
     public async Task<IActionResult> Orgs()

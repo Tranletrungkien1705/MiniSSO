@@ -8,7 +8,7 @@ using MiniSSO.Services;
 namespace MiniSSO.Controllers;
 
 [Authorize]
-public class UserController(AppDbContext db, AccountSecurityService security, UserProfileService profiles) : Controller
+public class UserController(AppDbContext db, AccountSecurityService security, UserProfileService profiles, UserDeleteService userDelete) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -73,6 +73,17 @@ public class UserController(AppDbContext db, AccountSecurityService security, Us
         { TempData["Error"] = "Mật khẩu mới phải từ 6 ký tự."; return RedirectToAction(nameof(Index)); }
         await security.ResetPasswordAsync(id, newPassword);
         TempData["Success"] = "Đã đặt lại mật khẩu.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Xoá người dùng kèm dọn liên kết nhóm (port từ iNOS.InBrand: SysUserManager.Remove →
+    // SysUserDeleteX + SysUserInGroupProvider.RemoveByUser).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var res = await userDelete.DeleteAsync(id);
+        if (!res.Ok) TempData["Error"] = res.Error;
+        else TempData["Success"] = $"Đã xoá người dùng (gỡ khỏi {res.RemovedGroupLinks} nhóm).";
         return RedirectToAction(nameof(Index));
     }
 }
