@@ -470,3 +470,31 @@ public class SessionController(AppDbContext db, SessionService sessions) : Contr
         return RedirectToAction(nameof(Index));
     }
 }
+
+// Thành viên nhóm (port từ iNOS.InBrand: SysUserProvider.GetAllUserByGroupCode / GetAllUserNotInGroup
+// + SysUserInGroupProvider.RemoveByUser). Màn hình "Gán người dùng vào nhóm" của iNOS (SysGroupController.GetSysUser)
+// cho biết ai ĐANG trong nhóm và ai CHƯA thuộc nhóm nào; MiniSSO trước đây chỉ thêm/bớt/thay-thế mà không truy vấn được.
+[Authorize]
+public class GroupMemberController(AppDbContext db, GroupService groups) : Controller
+{
+    public async Task<IActionResult> Index(Guid? groupId)
+    {
+        var allGroups = await db.Groups.OrderBy(g => g.Code).ToListAsync();
+        var selected = groupId != null ? allGroups.FirstOrDefault(g => g.Id == groupId) : allGroups.FirstOrDefault();
+
+        ViewBag.Groups = allGroups;
+        ViewBag.Selected = selected;
+        ViewBag.Members = selected != null ? await groups.MembersOfGroupAsync(selected.Id) : new List<AppUser>();
+        ViewBag.NotInAnyGroup = await groups.UsersNotInAnyGroupAsync();
+        return View();
+    }
+
+    // Gỡ 1 người dùng khỏi mọi nhóm (↔ SysUserInGroupProvider.RemoveByUser).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveFromAllGroups(Guid userId, Guid? groupId)
+    {
+        var n = await groups.RemoveUserFromAllGroupsAsync(userId);
+        TempData["Success"] = $"Đã gỡ người dùng khỏi {n} nhóm.";
+        return RedirectToAction(nameof(Index), new { groupId });
+    }
+}

@@ -1,0 +1,92 @@
+@{
+    ViewData["Title"] = "Thành viên nhóm";
+    var groups = (List<Group>)ViewBag.Groups;
+    var selected = (Group?)ViewBag.Selected;
+    var members = (List<AppUser>)ViewBag.Members;
+    var notInAnyGroup = (List<AppUser>)ViewBag.NotInAnyGroup;
+}
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Chọn nhóm</h6>
+            @if (groups.Count == 0)
+            {
+                <p class="text-muted mb-0">Chưa có nhóm nào. Tạo nhóm ở mục <a href="/Group">Nhóm &amp; Phân quyền</a>.</p>
+            }
+            else
+            {
+                <div class="list-group">
+                    @foreach (var g in groups)
+                    {
+                        var active = selected != null && selected.Id == g.Id;
+                        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(active ? "active" : "")"
+                           href="@Url.Action("Index", new { groupId = g.Id })">
+                            <span><code class="@(active ? "text-white" : "")">@g.Code</code> <span class="small">@g.Name</span></span>
+                            @if (!g.IsActive) { <span class="badge bg-secondary">khóa</span> }
+                        </a>
+                    }
+                </div>
+            }
+            <p class="text-muted small mt-3 mb-0">Port từ iNOS.InBrand: <code>SysUserProvider.GetAllUserByGroupCode</code> (ai đang trong nhóm) và <code>GetAllUserNotInGroup</code> (ai chưa thuộc nhóm nào).</p>
+        </div></div>
+    </div>
+
+    <div class="col-lg-8">
+        @if (selected == null)
+        {
+            <div class="card"><div class="card-body"><p class="text-muted mb-0">Chọn một nhóm để xem thành viên.</p></div></div>
+        }
+        else
+        {
+            <div class="card mb-3"><div class="card-body">
+                <h6 class="fw-bold mb-3">Thành viên nhóm <code>@selected.Code</code> (@members.Count)</h6>
+                @if (members.Count == 0)
+                {
+                    <p class="text-muted mb-0">Nhóm chưa có thành viên nào.</p>
+                }
+                else
+                {
+                    <table class="table align-middle mb-0">
+                        <thead><tr><th>Email</th><th>Họ tên</th><th>Trạng thái</th><th class="text-end">Thao tác</th></tr></thead>
+                        <tbody>
+                        @foreach (var u in members)
+                        {
+                            <tr>
+                                <td>@u.Email</td>
+                                <td class="text-muted small">@u.FullName</td>
+                                <td>@if (u.IsActive) { <span class="badge bg-success">bật</span> } else { <span class="badge bg-secondary">khóa</span> }</td>
+                                <td class="text-end">
+                                    <form asp-action="RemoveFromAllGroups" method="post" class="d-inline" onsubmit="return confirm('Gỡ @u.Email khỏi MỌI nhóm?');">@Html.AntiForgeryToken()
+                                        <input type="hidden" name="userId" value="@u.Id" /><input type="hidden" name="groupId" value="@selected.Id" />
+                                        <button class="btn btn-sm btn-outline-danger py-0">Gỡ khỏi mọi nhóm</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+            </div></div>
+
+            <div class="card"><div class="card-body">
+                <h6 class="fw-bold mb-3">Người dùng chưa thuộc nhóm nào (@notInAnyGroup.Count)</h6>
+                @if (notInAnyGroup.Count == 0)
+                {
+                    <p class="text-muted mb-0">Mọi người dùng đều đã thuộc ít nhất một nhóm.</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var u in notInAnyGroup)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>@u.Email <span class="text-muted small">@u.FullName</span></span>
+                                <a class="btn btn-sm btn-outline-primary py-0" href="/Group">Gán vào nhóm</a>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div></div>
+        }
+    </div>
+</div>

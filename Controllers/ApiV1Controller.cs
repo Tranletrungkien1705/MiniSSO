@@ -251,6 +251,34 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         return Ok(new { ok = true });
     }
 
+    // ── Truy vấn thành viên nhóm (port từ iNOS.InBrand: SysUserProvider.GetAllUserByGroupCode /
+    //    GetAllUserNotInGroup + SysUserInGroupProvider.RemoveByUser) ──
+    // Danh sách người dùng đang thuộc 1 nhóm (↔ GetAllUserByGroupCode).
+    [HttpGet("groups/{id:guid}/members")]
+    public async Task<IActionResult> GroupMembers(Guid id, GroupService groups)
+    {
+        if (!await db.Groups.AnyAsync(g => g.Id == id)) return NotFound(new { error = "Không tìm thấy nhóm." });
+        var members = await groups.MembersOfGroupAsync(id);
+        return Ok(members.Select(u => new { u.Id, u.Email, u.FullName, u.IsActive }));
+    }
+
+    // Danh sách người dùng CHƯA thuộc bất kỳ nhóm nào (↔ GetAllUserNotInGroup).
+    [HttpGet("users-not-in-group")]
+    public async Task<IActionResult> UsersNotInGroup(GroupService groups)
+    {
+        var users = await groups.UsersNotInAnyGroupAsync();
+        return Ok(users.Select(u => new { u.Id, u.Email, u.FullName, u.IsActive }));
+    }
+
+    // Gỡ 1 người dùng khỏi mọi nhóm (↔ SysUserInGroupProvider.RemoveByUser).
+    [HttpDelete("users/{id:guid}/groups")]
+    public async Task<IActionResult> RemoveUserFromGroups(Guid id, GroupService groups)
+    {
+        if (!await db.Users.AnyAsync(u => u.Id == id)) return NotFound(new { error = "Không tìm thấy người dùng." });
+        var removed = await groups.RemoveUserFromAllGroupsAsync(id);
+        return Ok(new { ok = true, removed });
+    }
+
     // ── Cây tổ chức (port từ iNOS.InBrand: Mst_Org) ──
     [HttpGet("orgs")]
     public async Task<IActionResult> Orgs()

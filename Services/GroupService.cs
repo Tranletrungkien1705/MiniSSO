@@ -95,4 +95,44 @@ public sealed class GroupService(AppDbContext db)
         await db.SaveChangesAsync();
         return true;
     }
+
+    // ── Truy vấn thành viên nhóm (port từ iNOS.InBrand: SysUserProvider.GetAllUserByGroupCode /
+    //    GetAllUserNotInGroup + SysUserInGroupProvider.RemoveByUser) ──
+    // iNOS dùng 2 truy vấn này cho màn hình "Gán người dùng vào nhóm" (SysGroupController.GetSysUser):
+    //   • GetAllUserByGroupCode: danh sách người dùng ĐANG thuộc 1 nhóm (để tích sẵn),
+    //   • GetAllUserNotInGroup:  danh sách người dùng CHƯA thuộc bất kỳ nhóm nào.
+    // MiniSSO trước đây chỉ thêm/bớt/thay-thế thành viên mà KHÔNG truy vấn được "ai đang trong nhóm".
+
+    /// <summary>
+    /// Danh sách người dùng đang thuộc 1 nhóm (↔ SysUserProvider.GetAllUserByGroupCode).
+    /// Trả về rỗng nếu nhóm không tồn tại.
+    /// </summary>
+    public async Task<List<AppUser>> MembersOfGroupAsync(Guid groupId)
+    {
+        if (!await db.Groups.AnyAsync(g => g.Id == groupId)) return [];
+        var userIds = await db.GroupMembers.Where(m => m.GroupId == groupId).Select(m => m.UserId).ToListAsync();
+        return await db.Users.Where(u => userIds.Contains(u.Id)).OrderBy(u => u.Email).ToListAsync();
+    }
+
+    /// <summary>
+    /// Danh sách người dùng CHƯA thuộc bất kỳ nhóm nào (↔ SysUserProvider.GetAllUserNotInGroup).
+    /// </summary>
+    public async Task<List<AppUser>> UsersNotInAnyGroupAsync()
+    {
+        var memberIds = await db.GroupMembers.Select(m => m.UserId).Distinct().ToListAsync();
+        return await db.Users.Where(u => !memberIds.Contains(u.Id)).OrderBy(u => u.Email).ToListAsync();
+    }
+
+    /// <summary>
+    /// Gỡ 1 người dùng khỏi MỌI nhóm (↔ SysUserInGroupProvider.RemoveByUser) — dùng khi xoá người dùng.
+    /// Trả về số liên kết đã gỡ.
+    /// </summary>
+    public async Task<int> RemoveUserFromAllGroupsAsync(Guid userId)
+    {
+        var links = await db.GroupMembers.Where(m => m.UserId == userId).ToListAsync();
+        if (links.Count == 0) return 0;
+        db.GroupMembers.RemoveRange(links);
+        await db.SaveChangesAsync();
+        return links.Count;
+    }
 }
