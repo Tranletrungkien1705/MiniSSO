@@ -737,6 +737,31 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         });
     }
 
+    // ── Truy vấn người dùng theo đơn vị / trạng thái (port từ iNOS.InBrand:
+    //    SysUserService.GetByDLCode + GetAllByEnable) ──
+    // iNOS không có 1 hàm "lấy tất cả người dùng": mỗi màn hình gọi truy vấn có điều kiện.
+    // GetByDLCode → người dùng thuộc 1 đại lý/đơn vị (kèm nhóm); GetAllByEnable → lọc theo cờ hoạt động
+    // (màn hình "Gán người dùng vào nhóm" chỉ liệt kê người ĐANG hoạt động).
+    [HttpGet("users/by-org/{orgId:guid}")]
+    public async Task<IActionResult> UsersByOrg(Guid orgId, UserQueryService userQuery)
+    {
+        if (!await db.Orgs.AnyAsync(o => o.Id == orgId)) return NotFound(new { error = "Không tìm thấy đơn vị." });
+        var rows = await userQuery.ByOrgAsync(orgId);
+        return Ok(rows.Select(r => new
+        {
+            r.User.Id, r.User.Email, r.User.FullName, r.User.IsActive, r.User.IsSysAdmin, r.User.OrgId,
+            groups = r.Groups.Select(g => new { g.Id, g.Code, g.Name })
+        }));
+    }
+
+    // Danh sách người dùng lọc theo trạng thái hoạt động (↔ GetAllByEnable). active rỗng = tất cả.
+    [HttpGet("users/by-active")]
+    public async Task<IActionResult> UsersByActive([FromQuery] bool? active, UserQueryService userQuery)
+    {
+        var users = await userQuery.ByActiveAsync(active);
+        return Ok(users.Select(u => new { u.Id, u.Email, u.FullName, u.IsActive, u.IsSysAdmin, u.OrgId }));
+    }
+
     // Thông tin OIDC discovery (để SPA hiển thị hướng dẫn tích hợp).
     [HttpGet("oidc-info")]
     public IActionResult OidcInfo()

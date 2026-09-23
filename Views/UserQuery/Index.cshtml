@@ -1,0 +1,99 @@
+@{
+    ViewData["Title"] = "Người dùng theo đơn vị / trạng thái";
+    var orgs = (List<Org>)ViewBag.Orgs;
+    var selected = (Org?)ViewBag.Selected;
+    var byOrg = (List<UserSearchRow>)ViewBag.ByOrg;
+    var byActive = (List<AppUser>)ViewBag.ByActive;
+    bool? active = (bool?)ViewBag.Active;
+}
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Chọn đơn vị</h6>
+            @if (orgs.Count == 0)
+            {
+                <p class="text-muted mb-0">Chưa có đơn vị nào. Tạo ở mục <a href="/Org">Tổ chức</a>.</p>
+            }
+            else
+            {
+                <div class="list-group">
+                    @foreach (var o in orgs)
+                    {
+                        var isSel = selected != null && selected.Id == o.Id;
+                        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(isSel ? "active" : "")"
+                           href="@Url.Action("Index", new { orgId = o.Id, active })">
+                            <span><code class="@(isSel ? "text-white" : "")">@o.Code</code> <span class="small">@o.Name</span></span>
+                            @if (!o.IsActive) { <span class="badge bg-secondary">khóa</span> }
+                        </a>
+                    }
+                </div>
+            }
+            <p class="text-muted small mt-3 mb-0">Port từ iNOS.InBrand: <code>SysUserService.GetByDLCode</code> (người dùng theo đơn vị, kèm nhóm) và <code>GetAllByEnable</code> (lọc theo cờ hoạt động).</p>
+        </div></div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card mb-3"><div class="card-body">
+            <h6 class="fw-bold mb-3">
+                Người dùng thuộc đơn vị
+                @if (selected != null) { <code>@selected.Code</code> <span class="text-muted small">@selected.Name</span> }
+                (@byOrg.Count)
+            </h6>
+            @if (selected == null)
+            {
+                <p class="text-muted mb-0">Chọn một đơn vị để xem người dùng.</p>
+            }
+            else if (byOrg.Count == 0)
+            {
+                <p class="text-muted mb-0">Đơn vị này chưa có người dùng nào.</p>
+            }
+            else
+            {
+                <table class="table align-middle mb-0">
+                    <thead><tr><th>Email</th><th>Họ tên</th><th>Nhóm</th><th>Trạng thái</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in byOrg)
+                    {
+                        <tr>
+                            <td>@r.User.Email</td>
+                            <td class="text-muted small">@r.User.FullName</td>
+                            <td>
+                                @if (r.Groups.Count == 0) { <span class="text-muted small">—</span> }
+                                else { @foreach (var g in r.Groups) { <span class="badge bg-light text-dark border me-1">@g.Code</span> } }
+                            </td>
+                            <td>@if (r.User.IsActive) { <span class="badge bg-success">bật</span> } else { <span class="badge bg-secondary">khóa</span> }</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div></div>
+
+        <div class="card"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold mb-0">Người dùng theo trạng thái hoạt động (@byActive.Count)</h6>
+                <div class="btn-group btn-group-sm">
+                    <a class="btn btn-outline-primary @(active == true ? "active" : "")" href="@Url.Action("Index", new { orgId = selected?.Id, active = true })">Đang hoạt động</a>
+                    <a class="btn btn-outline-primary @(active == false ? "active" : "")" href="@Url.Action("Index", new { orgId = selected?.Id, active = false })">Bị vô hiệu</a>
+                    <a class="btn btn-outline-primary @(active == null ? "active" : "")" href="@Url.Action("Index", new { orgId = selected?.Id })">Tất cả</a>
+                </div>
+            </div>
+            @if (byActive.Count == 0)
+            {
+                <p class="text-muted mb-0">Không có người dùng nào khớp.</p>
+            }
+            else
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var u in byActive)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span>@u.Email <span class="text-muted small">@u.FullName</span></span>
+                            @if (u.IsActive) { <span class="badge bg-success">bật</span> } else { <span class="badge bg-secondary">khóa</span> }
+                        </li>
+                    }
+                </ul>
+            }
+        </div></div>
+    </div>
+</div>

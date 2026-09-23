@@ -645,6 +645,27 @@ public class SearchController(AppDbContext db, SearchService search) : Controlle
     }
 }
 
+// Truy vấn người dùng theo đơn vị / trạng thái (port từ iNOS.InBrand:
+// SysUserService.GetByDLCode + GetAllByEnable). Màn hình "Gán người dùng vào nhóm" của iNOS
+// (SysGroupController.GetSysUser) dùng GetAllByEnable để chỉ liệt kê người ĐANG hoạt động;
+// GetByDLCode liệt kê người dùng thuộc 1 đại lý/đơn vị (kèm nhóm).
+[Authorize]
+public class UserQueryController(AppDbContext db, UserQueryService userQuery) : Controller
+{
+    public async Task<IActionResult> Index(Guid? orgId, bool? active)
+    {
+        var orgs = await db.Orgs.OrderBy(o => o.BuCode).ToListAsync();
+        var selected = orgId != null ? orgs.FirstOrDefault(o => o.Id == orgId) : orgs.FirstOrDefault();
+
+        ViewBag.Orgs = orgs;
+        ViewBag.Selected = selected;
+        ViewBag.Active = active;
+        ViewBag.ByOrg = selected != null ? await userQuery.ByOrgAsync(selected.Id) : new List<UserSearchRow>();
+        ViewBag.ByActive = await userQuery.ByActiveAsync(active);
+        return View();
+    }
+}
+
 // Gán module trực tiếp cho nhóm (port từ iNOS.InBrand: Sys_Access = GroupCode + ModuleCode).
 // Màn hình "Gán module vào nhóm" của iNOS (SysGroupController.GetSysModule) liệt kê TẤT CẢ module
 // kèm cờ "đã gán cho nhóm này chưa" (SysAccessService.GetAllAccessByGroupCode); SaveModuleInGroup →
