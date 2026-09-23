@@ -418,6 +418,34 @@ public class UserTeamController(AppDbContext db, UserTeamService teams) : Contro
     }
 }
 
+// Kiểm tra tồn tại/trạng thái trước khi lưu (port từ iNOS.InBrand: mẫu "CheckDB").
+// Màn hình cho phép chạy thử mẫu kiểm tra dùng chung của iNOS trên 4 loại thực thể.
+[Authorize]
+public class CheckDbController(AppDbContext db, CheckDbService checkDb) : Controller
+{
+    public async Task<IActionResult> Index(string? kind, string? code, string? exist, string? active)
+    {
+        ViewBag.Kinds = Enum.GetNames<CheckDbService.EntityKind>();
+        ViewBag.Kind = kind ?? "User";
+        ViewBag.Code = code ?? "";
+        ViewBag.Exist = exist ?? "";
+        ViewBag.Active = active ?? "";
+
+        // Gợi ý mã để thử nhanh (mã thật đang có trong hệ thống).
+        ViewBag.Samples = new Dictionary<string, List<string>>
+        {
+            ["User"] = await db.Users.OrderBy(u => u.Email).Select(u => u.Email).Take(10).ToListAsync(),
+            ["Group"] = await db.Groups.OrderBy(g => g.Code).Select(g => g.Code).Take(10).ToListAsync(),
+            ["Module"] = await db.Modules.OrderBy(m => m.Code).Select(m => m.Code).Take(10).ToListAsync(),
+            ["Org"] = await db.Orgs.OrderBy(o => o.Code).Select(o => o.Code).Take(10).ToListAsync(),
+        };
+
+        if (!string.IsNullOrWhiteSpace(code) && Enum.TryParse<CheckDbService.EntityKind>(kind ?? "User", ignoreCase: true, out var k))
+            ViewBag.Result = await checkDb.CheckAsync(k, code, exist ?? "", active ?? "");
+        return View();
+    }
+}
+
 // Phiên làm việc hiệu lực: SysSession / GlobSession (port từ iNOS.InBrand).
 [Authorize]
 public class SessionController(AppDbContext db, SessionService sessions) : Controller

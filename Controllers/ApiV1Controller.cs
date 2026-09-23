@@ -13,7 +13,7 @@ namespace MiniSSO.Controllers;
 [ApiController]
 [Route("api/v1")]
 [Produces("application/json")]
-public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security, DataScopeService scope, ModuleService modules, ViewGroupService viewGroups, UserTeamService teams, SessionService sessions, SelfServiceService selfService) : ControllerBase
+public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security, DataScopeService scope, ModuleService modules, ViewGroupService viewGroups, UserTeamService teams, SessionService sessions, SelfServiceService selfService, CheckDbService checkDb) : ControllerBase
 {
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard()
@@ -41,7 +41,9 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         if (string.IsNullOrWhiteSpace(r.Email) || string.IsNullOrWhiteSpace(r.Password))
             return BadRequest(new { error = "Cần email và mật khẩu." });
         var email = r.Email.Trim().ToLowerInvariant();
-        if (await db.Users.AnyAsync(u => u.Email == email)) return BadRequest(new { error = "Email đã tồn tại." });
+        // Kiểm tra theo mẫu CheckDB (↔ SysUserCheckDB): người dùng PHẢI CHƯA tồn tại.
+        var chk = await checkDb.CheckAsync(CheckDbService.EntityKind.User, email, CheckDbService.FlagInactive);
+        if (!chk.Ok) return BadRequest(new { error = chk.Error });
         var u = new AppUser { Email = email, FullName = r.FullName ?? "", Roles = r.Roles ?? "", Tenant = r.Tenant, PasswordHash = PasswordHasher.Hash(r.Password) };
         db.Users.Add(u); await db.SaveChangesAsync();
         return Ok(new { id = u.Id });
@@ -180,7 +182,9 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
     {
         if (string.IsNullOrWhiteSpace(r.Code)) return BadRequest(new { error = "Cần mã nhóm." });
         var code = r.Code.Trim().ToUpperInvariant();
-        if (await db.Groups.AnyAsync(g => g.Code == code)) return BadRequest(new { error = "Mã nhóm đã tồn tại." });
+        // Kiểm tra theo mẫu CheckDB (↔ SysGroupCheckDB): nhóm PHẢI CHƯA tồn tại.
+        var chk = await checkDb.CheckAsync(CheckDbService.EntityKind.Group, code, CheckDbService.FlagInactive);
+        if (!chk.Ok) return BadRequest(new { error = chk.Error });
         var g = new Group { Code = code, Name = string.IsNullOrWhiteSpace(r.Name) ? code : r.Name!.Trim(), Description = r.Description };
         db.Groups.Add(g); await db.SaveChangesAsync();
         return Ok(new { id = g.Id });
@@ -300,7 +304,9 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
     {
         if (string.IsNullOrWhiteSpace(r.Code)) return BadRequest(new { error = "Cần mã đơn vị." });
         var code = r.Code.Trim();
-        if (await db.Orgs.AnyAsync(o => o.Code == code)) return BadRequest(new { error = "Mã đơn vị đã tồn tại." });
+        // Kiểm tra theo mẫu CheckDB (↔ MstDealerCheckDB): đơn vị PHẢI CHƯA tồn tại.
+        var chk = await checkDb.CheckAsync(CheckDbService.EntityKind.Org, code, CheckDbService.FlagInactive);
+        if (!chk.Ok) return BadRequest(new { error = chk.Error });
         if (r.ParentId != null && !await db.Orgs.AnyAsync(o => o.Id == r.ParentId)) return BadRequest(new { error = "Đơn vị cha không tồn tại." });
         var o = new Org { Code = code, Name = string.IsNullOrWhiteSpace(r.Name) ? code : r.Name!.Trim(), ParentId = r.ParentId, Remark = r.Remark };
         db.Orgs.Add(o); await db.SaveChangesAsync();
@@ -375,7 +381,9 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
     {
         if (string.IsNullOrWhiteSpace(r.Code)) return BadRequest(new { error = "Cần mã module." });
         var code = r.Code.Trim();
-        if (await db.Modules.AnyAsync(m => m.Code == code)) return BadRequest(new { error = "Mã module đã tồn tại." });
+        // Kiểm tra theo mẫu CheckDB (↔ MstModuleCheckDB): module PHẢI CHƯA tồn tại.
+        var chk = await checkDb.CheckAsync(CheckDbService.EntityKind.Module, code, CheckDbService.FlagInactive);
+        if (!chk.Ok) return BadRequest(new { error = chk.Error });
         if (r.ParentId != null && !await db.Modules.AnyAsync(m => m.Id == r.ParentId)) return BadRequest(new { error = "Module cha không tồn tại." });
         var m = new Module { Code = code, Title = string.IsNullOrWhiteSpace(r.Title) ? code : r.Title!.Trim(), Description = r.Description, ModuleType = r.ModuleType, ParentId = r.ParentId, SortOrder = r.SortOrder };
         db.Modules.Add(m); await db.SaveChangesAsync();
@@ -576,6 +584,20 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
     {
         if (!await sessions.EndAsync(sessionId)) return NotFound(new { error = "Không tìm thấy." });
         return Ok(new { ok = true });
+    }
+
+    // ── Kiểm tra tồn tại/trạng thái trước khi lưu (port từ iNOS.InBrand: mẫu "CheckDB") ──
+    // iNOS dùng cùng một mẫu ở mọi manager (SysUserCheckDB / SysGroupCheckDB / MstModuleCheckDB /
+    // MstDealerCheckDB): "1" = phải tồn tại, "0" = phải chưa tồn tại, và trạng thái thực tế phải
+    // nằm trong danh sách cờ hoạt động cho phép. Endpoint này phơi mẫu kiểm tra đó ra API.
+    [HttpGet("checkdb")]
+    public async Task<IActionResult> CheckDb([FromQuery] string kind, [FromQuery] string? code,
+        [FromQuery] string? exist, [FromQuery] string? active, CheckDbService checkDb)
+    {
+        if (!Enum.TryParse<CheckDbService.EntityKind>(kind, ignoreCase: true, out var k))
+            return BadRequest(new { error = "Loại không hợp lệ (User/Group/Module/Org)." });
+        var res = await checkDb.CheckAsync(k, code, exist ?? "", active ?? "");
+        return Ok(new { kind = k.ToString(), code, res.Ok, res.Exists, res.Status, res.Error });
     }
 
     // Thông tin OIDC discovery (để SPA hiển thị hướng dẫn tích hợp).

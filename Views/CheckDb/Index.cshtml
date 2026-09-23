@@ -1,0 +1,86 @@
+@{
+    ViewData["Title"] = "Kiểm tra trước khi lưu (CheckDB)";
+    var kinds = (string[])ViewBag.Kinds;
+    var kind = (string)ViewBag.Kind;
+    var code = (string)ViewBag.Code;
+    var exist = (string)ViewBag.Exist;
+    var active = (string)ViewBag.Active;
+    var samples = (Dictionary<string, List<string>>)ViewBag.Samples;
+    var result = ViewBag.Result as MiniSSO.Services.CheckDbService.CheckResult;
+}
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Chạy thử mẫu kiểm tra CheckDB</h6>
+            <form method="get">
+                <div class="mb-2">
+                    <label class="form-label small text-muted mb-1">Loại thực thể</label>
+                    <select name="kind" class="form-select">
+                        @foreach (var k in kinds)
+                        {
+                            <option value="@k" selected="@(k == kind)">@k</option>
+                        }
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small text-muted mb-1">Mã bản ghi</label>
+                    <input name="code" class="form-control" value="@code" placeholder="vd admin@minisso.dev / SYSADMIN / sso / 10" />
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small text-muted mb-1">Phải tồn tại? (strFlagExistToCheck)</label>
+                    <select name="exist" class="form-select">
+                        <option value="" selected="@(exist == "")">— bỏ qua —</option>
+                        <option value="1" selected="@(exist == "1")">1 · phải TỒN TẠI</option>
+                        <option value="0" selected="@(exist == "0")">0 · phải CHƯA tồn tại</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-muted mb-1">Cờ hoạt động cho phép (strFlagActiveListToCheck)</label>
+                    <input name="active" class="form-control" value="@active" placeholder="vd 1 (chỉ nhận bản ghi đang hoạt động)" />
+                </div>
+                <button class="btn btn-primary w-100"><i class="bi bi-search me-1"></i>Kiểm tra</button>
+            </form>
+            <p class="text-muted small mt-3 mb-0">
+                Mẫu port từ iNOS.InBrand: <code>SysUserCheckDB</code> / <code>SysGroupCheckDB</code> /
+                <code>MstModuleCheckDB</code> / <code>MstDealerCheckDB</code>. Cờ: <code>1</code> = Active/Yes,
+                <code>0</code> = Inactive/No.
+            </p>
+        </div></div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Kết quả</h6>
+            @if (result == null)
+            {
+                <p class="text-muted mb-0">Nhập mã bản ghi rồi bấm <b>Kiểm tra</b>.</p>
+            }
+            else
+            {
+                <div class="alert @(result.Ok ? "alert-success" : "alert-danger") mb-3">
+                    <i class="bi @(result.Ok ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i>
+                    @(result.Ok ? "Hợp lệ — có thể lưu." : result.Error)
+                </div>
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr><th style="width:40%">Tồn tại</th><td>@(result.Exists ? "có" : "không")</td></tr>
+                        <tr><th>Trạng thái thực tế</th><td>@(string.IsNullOrEmpty(result.Status) ? "—" : result.Status)</td></tr>
+                    </tbody>
+                </table>
+            }
+
+            <hr />
+            <h6 class="fw-bold mb-2 small text-muted text-uppercase">Mã gợi ý để thử</h6>
+            @foreach (var kv in samples)
+            {
+                <div class="mb-1 small">
+                    <span class="badge bg-light text-dark border me-1">@kv.Key</span>
+                    @foreach (var s in kv.Value)
+                    {
+                        <a class="me-2" href="?kind=@kv.Key&code=@s&exist=1&active=1"><code>@s</code></a>
+                    }
+                </div>
+            }
+        </div></div>
+    </div>
+</div>
