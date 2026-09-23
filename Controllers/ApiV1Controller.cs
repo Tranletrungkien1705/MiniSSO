@@ -211,6 +211,27 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         return Ok(new { ok = true, isActive = g.IsActive });
     }
 
+    // Cập nhật hồ sơ nhóm theo DANH SÁCH CỘT CHO PHÉP (port từ iNOS.InBrand:
+    // SysGroupManager.SysGroupUpdateX — mẫu "Ft_Cols_Upd"). Chỉ các cột có tên trong `columns`
+    // mới được ghi; các cột khác giữ nguyên. `columns` rỗng/null = cập nhật tất cả cột cho phép.
+    [HttpPut("groups/{id:guid}")]
+    public async Task<IActionResult> UpdateGroup(Guid id, [FromBody] GroupUpdateReq r, GroupProfileService profiles)
+    {
+        var patch = new GroupProfilePatch(r.Name, r.Description, r.IsActive, r.OrgId);
+        var res = await profiles.UpdateAsync(id, patch, r.Columns);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
+        return Ok(new { ok = true });
+    }
+
+    // Danh sách nhóm của 1 người dùng (↔ SysGroupProvider.GetAllByUser).
+    [HttpGet("users/{id:guid}/groups")]
+    public async Task<IActionResult> UserGroups(Guid id, GroupProfileService profiles)
+    {
+        if (!await db.Users.AnyAsync(u => u.Id == id)) return NotFound(new { error = "Không tìm thấy." });
+        var list = await profiles.GroupsOfUserAsync(id);
+        return Ok(list.Select(g => new { g.Id, g.Code, g.Name, g.Description, g.IsActive, g.OrgId }));
+    }
+
     [HttpGet("objects")]
     public async Task<IActionResult> Objects()
         => Ok((await db.PermissionObjects.OrderBy(o => o.Code).ToListAsync()).Select(o => new { o.Id, o.Code, o.Name, o.Module, o.IsActive }));
@@ -661,6 +682,8 @@ public class UserUpdateReq { public string? Email { get; set; } public string? F
 public class ClientReq { public string ClientId { get; set; } = ""; public string? Name { get; set; } public string? RedirectUris { get; set; } public string? Grants { get; set; } public string? Scopes { get; set; } public string? Secret { get; set; } public bool RequirePkce { get; set; } = true; }
 public class LicenseCheckReq { public string? LicenseKey { get; set; } public string? AppSlug { get; set; } public string? InstanceHost { get; set; } }
 public class GroupReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Description { get; set; } }
+// Cập nhật hồ sơ nhóm theo cột cho phép (↔ SysGroupUpdateX / Ft_Cols_Upd). Columns = danh sách cột được ghi.
+public class GroupUpdateReq { public string? Name { get; set; } public string? Description { get; set; } public bool IsActive { get; set; } = true; public Guid? OrgId { get; set; } public List<string>? Columns { get; set; } }
 public class GroupAccessReq { public string ObjectCode { get; set; } = ""; public bool Grant { get; set; } = true; }
 public class GroupMemberReq { public Guid UserId { get; set; } public bool Add { get; set; } = true; }
 public class GroupMembersReq { public List<Guid>? UserIds { get; set; } }

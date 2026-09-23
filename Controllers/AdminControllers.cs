@@ -78,7 +78,7 @@ public class UserController(AppDbContext db, AccountSecurityService security, Us
 }
 
 [Authorize]
-public class GroupController(AppDbContext db, GroupService groups) : Controller
+public class GroupController(AppDbContext db, GroupService groups, GroupProfileService profiles) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -88,6 +88,17 @@ public class GroupController(AppDbContext db, GroupService groups) : Controller
         ViewBag.Access = await db.GroupAccesses.ToListAsync();
         ViewBag.Orgs = await db.Orgs.OrderBy(o => o.BuCode).ToListAsync();
         return View(await db.Groups.OrderBy(g => g.Code).ToListAsync());
+    }
+
+    // Cập nhật hồ sơ nhóm theo DANH SÁCH CỘT CHO PHÉP (port từ iNOS.InBrand: SysGroupUpdateX / Ft_Cols_Upd).
+    // Form gửi kèm các cột người dùng chọn sửa; chỉ những cột đó được ghi, cột khác giữ nguyên.
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Update(Guid id, string? name, string? description, bool isActive, Guid? orgId, string[]? columns)
+    {
+        var patch = new GroupProfilePatch(name, description, isActive, orgId);
+        var res = await profiles.UpdateAsync(id, patch, columns);
+        if (!res.Ok) TempData["Error"] = res.Error; else TempData["Success"] = "Đã cập nhật hồ sơ nhóm.";
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpPost, ValidateAntiForgeryToken]
