@@ -16,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
     public DbSet<PermissionObject> PermissionObjects => Set<PermissionObject>();
     public DbSet<GroupAccess> GroupAccesses => Set<GroupAccess>();
+    public DbSet<Org> Orgs => Set<Org>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -29,5 +30,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<GroupMember>(e => e.HasIndex(x => new { x.GroupId, x.UserId }).IsUnique());
         b.Entity<PermissionObject>(e => e.HasIndex(x => x.Code).IsUnique());
         b.Entity<GroupAccess>(e => e.HasIndex(x => new { x.GroupId, x.ObjectId }).IsUnique());
+        b.Entity<Org>(e => e.HasIndex(x => x.Code).IsUnique());
     }
 }

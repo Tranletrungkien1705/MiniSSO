@@ -23,6 +23,7 @@ builder.Services.AddSingleton<SigningKeyStore>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<RbacService>();
+builder.Services.AddScoped<OrgService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(o => { o.LoginPath = "/Account/Login"; o.Cookie.Name = "minisso.sid"; });
 builder.Services.AddAuthorization();

@@ -140,3 +140,24 @@ public class GroupAccess
     public Guid ObjectId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+
+// ── Tổ chức theo cây (port từ iNOS.InBrand: Mst_Org) ──
+// iNOS lưu cây tổ chức dạng "materialized path": mỗi nút có OrgParent (cha) và 3 cột dẫn xuất
+// OrgBUCode (đường dẫn mã, vd "0.10.20"), OrgBUPattern (tiền tố để truy vấn cả nhánh, vd "0.10.20%"),
+// OrgLevel (độ sâu). MiniSSO trước đây chỉ có chuỗi Tenant phẳng trên AppUser; bổ sung cây tổ chức
+// để biết 1 đơn vị nằm ở đâu trong cấu trúc và lấy được toàn bộ nhánh con của nó.
+
+/// <summary>Đơn vị tổ chức (tương ứng Mst_Org). Cây phân cấp qua <see cref="ParentId"/>.</summary>
+public class Org
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Code { get; set; } = "";          // mã đơn vị (Mst_Org.OrgID)
+    public string Name { get; set; } = "";          // tên hiển thị
+    public Guid? ParentId { get; set; }              // đơn vị cha (Mst_Org.OrgParent); null = gốc
+    public string BuCode { get; set; } = "";        // đường dẫn mã (Mst_Org.OrgBUCode), vd "0.10.20"
+    public string BuPattern { get; set; } = "";     // tiền tố nhánh (Mst_Org.OrgBUPattern), vd "0.10.20%"
+    public int Level { get; set; } = 1;              // độ sâu (Mst_Org.OrgLevel)
+    public string? Remark { get; set; }
+    public bool IsActive { get; set; } = true;       // Mst_Org.FlagActive
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

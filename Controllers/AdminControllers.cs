@@ -118,3 +118,37 @@ public class ClientController(AppDbContext db) : Controller
         return RedirectToAction(nameof(Index));
     }
 }
+
+[Authorize]
+public class OrgController(AppDbContext db, OrgService orgs) : Controller
+{
+    public async Task<IActionResult> Index()
+    {
+        var all = await db.Orgs.OrderBy(o => o.BuCode).ToListAsync();
+        ViewBag.Children = all.Where(o => o.ParentId != null).GroupBy(o => o.ParentId!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+        return View(all);
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(string code, string? name, Guid? parentId, string? remark)
+    {
+        if (string.IsNullOrWhiteSpace(code)) { TempData["Error"] = "Cần mã đơn vị."; return RedirectToAction(nameof(Index)); }
+        var c = code.Trim();
+        if (await db.Orgs.AnyAsync(o => o.Code == c)) { TempData["Error"] = "Mã đơn vị đã tồn tại."; return RedirectToAction(nameof(Index)); }
+        if (parentId != null && !await db.Orgs.AnyAsync(o => o.Id == parentId)) { TempData["Error"] = "Đơn vị cha không tồn tại."; return RedirectToAction(nameof(Index)); }
+        db.Orgs.Add(new Org { Code = c, Name = string.IsNullOrWhiteSpace(name) ? c : name!.Trim(), ParentId = parentId, Remark = remark });
+        await db.SaveChangesAsync();
+        await orgs.RebuildPathsAsync();   // cập nhật BuCode/BuPattern/Level cho cả cây
+        TempData["Success"] = "Đã tạo đơn vị tổ chức.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Toggle(Guid id)
+    {
+        var o = await db.Orgs.FirstOrDefaultAsync(x => x.Id == id);
+        if (o != null) { o.IsActive = !o.IsActive; await db.SaveChangesAsync(); }
+        return RedirectToAction(nameof(Index));
+    }
+}

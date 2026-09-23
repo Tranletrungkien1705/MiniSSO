@@ -192,6 +192,34 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac) : 
         return Ok(new { userId = id, groups = await rbac.GroupCodesAsync(id), permissions = await rbac.EffectivePermissionsAsync(id) });
     }
 
+    // ── Cây tổ chức (port từ iNOS.InBrand: Mst_Org) ──
+    [HttpGet("orgs")]
+    public async Task<IActionResult> Orgs()
+        => Ok((await db.Orgs.OrderBy(o => o.BuCode).ToListAsync())
+            .Select(o => new { o.Id, o.Code, o.Name, o.ParentId, o.BuCode, o.BuPattern, o.Level, o.Remark, o.IsActive }));
+
+    [HttpPost("orgs")]
+    public async Task<IActionResult> CreateOrg([FromBody] OrgReq r, OrgService orgs)
+    {
+        if (string.IsNullOrWhiteSpace(r.Code)) return BadRequest(new { error = "Cần mã đơn vị." });
+        var code = r.Code.Trim();
+        if (await db.Orgs.AnyAsync(o => o.Code == code)) return BadRequest(new { error = "Mã đơn vị đã tồn tại." });
+        if (r.ParentId != null && !await db.Orgs.AnyAsync(o => o.Id == r.ParentId)) return BadRequest(new { error = "Đơn vị cha không tồn tại." });
+        var o = new Org { Code = code, Name = string.IsNullOrWhiteSpace(r.Name) ? code : r.Name!.Trim(), ParentId = r.ParentId, Remark = r.Remark };
+        db.Orgs.Add(o); await db.SaveChangesAsync();
+        await orgs.RebuildPathsAsync();
+        return Ok(new { id = o.Id, buCode = o.BuCode, level = o.Level });
+    }
+
+    // Toàn bộ nhánh con (kể cả chính nó) của 1 đơn vị — dựa trên tiền tố BuPattern.
+    [HttpGet("orgs/{id:guid}/subtree")]
+    public async Task<IActionResult> OrgSubtree(Guid id, OrgService orgs)
+    {
+        if (!await db.Orgs.AnyAsync(o => o.Id == id)) return NotFound(new { error = "Không tìm thấy." });
+        var nodes = await orgs.SubtreeAsync(id);
+        return Ok(nodes.Select(o => new { o.Id, o.Code, o.Name, o.BuCode, o.Level }));
+    }
+
     // Thông tin OIDC discovery (để SPA hiển thị hướng dẫn tích hợp).
     [HttpGet("oidc-info")]
     public IActionResult OidcInfo()
@@ -213,3 +241,5 @@ public class LicenseCheckReq { public string? LicenseKey { get; set; } public st
 public class GroupReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Description { get; set; } }
 public class GroupAccessReq { public string ObjectCode { get; set; } = ""; public bool Grant { get; set; } = true; }
 public class GroupMemberReq { public Guid UserId { get; set; } public bool Add { get; set; } = true; }
+public class OrgReq { public string Code { get; set; } = ""; public string? Name { get; set; } public Guid? ParentId { get; set; } public string? Remark { get; set; }
+}

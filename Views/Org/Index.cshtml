@@ -1,0 +1,53 @@
+@model List<Org>
+@{
+    ViewData["Title"] = "Tổ chức";
+    var children = (Dictionary<Guid, int>)ViewBag.Children;
+    string Indent(int level) => new string('—', Math.Max(0, level - 1));
+}
+<div class="row g-3">
+    <div class="col-lg-4"><div class="card"><div class="card-body">
+        <h6 class="fw-bold mb-3">Thêm đơn vị</h6>
+        <form asp-action="Create" method="post">@Html.AntiForgeryToken()
+            <div class="mb-2"><input name="code" class="form-control" placeholder="Mã đơn vị * (vd 10)" required /></div>
+            <div class="mb-2"><input name="name" class="form-control" placeholder="Tên hiển thị" /></div>
+            <div class="mb-2">
+                <select name="parentId" class="form-select">
+                    <option value="">— Không có (nút gốc) —</option>
+                    @foreach (var o in Model)
+                    {
+                        <option value="@o.Id">@o.BuCode · @o.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="mb-3"><input name="remark" class="form-control" placeholder="Ghi chú" /></div>
+            <button class="btn btn-primary w-100"><i class="bi bi-diagram-2 me-1"></i>Tạo đơn vị</button>
+        </form>
+        <p class="text-muted small mt-3 mb-0">Cây tổ chức port từ iNOS.InBrand (Mst_Org): mỗi nút có đường dẫn mã <code>BuCode</code>, tiền tố nhánh <code>BuPattern</code> và độ sâu <code>Level</code> được tính lại tự động.</p>
+    </div></div></div>
+
+    <div class="col-lg-8"><div class="card"><div class="card-body">
+        <h6 class="fw-bold mb-3">Cây tổ chức (@Model.Count đơn vị)</h6>
+        <table class="table table-sm align-middle mb-0">
+            <thead><tr><th>Đơn vị</th><th>BuCode</th><th>Level</th><th>Nhánh con</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var o in Model)
+            {
+                <tr>
+                    <td>
+                        <span class="text-muted">@Indent(o.Level)</span>
+                        <span class="fw-semibold">@o.Name</span>
+                        <code class="ms-1">@o.Code</code>
+                        @if (!o.IsActive) { <span class="badge bg-secondary ms-1">khóa</span> }
+                    </td>
+                    <td><code>@o.BuCode</code></td>
+                    <td>@o.Level</td>
+                    <td>@children.GetValueOrDefault(o.Id)</td>
+                    <td class="text-end">
+                        <form asp-action="Toggle" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@o.Id" /><button class="btn btn-sm btn-outline-secondary">@(o.IsActive ? "Khóa" : "Mở")</button></form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div></div></div>
+</div>

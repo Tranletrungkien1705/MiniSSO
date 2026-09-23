@@ -35,6 +35,11 @@ public static class Seeder
                 "CREATE TABLE IF NOT EXISTS minisso.\"GroupAccesses\" (\"Id\" uuid PRIMARY KEY, \"GroupId\" uuid NOT NULL, \"ObjectId\" uuid NOT NULL, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_GroupAccesses_GroupId_ObjectId\" ON minisso.\"GroupAccesses\" (\"GroupId\", \"ObjectId\")");
+            // Cây tổ chức (thêm sau) — EnsureCreated không tạo trên Postgres đã tồn tại.
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE TABLE IF NOT EXISTS minisso.\"Orgs\" (\"Id\" uuid PRIMARY KEY, \"Code\" text NOT NULL DEFAULT '', \"Name\" text NOT NULL DEFAULT '', \"ParentId\" uuid NULL, \"BuCode\" text NOT NULL DEFAULT '', \"BuPattern\" text NOT NULL DEFAULT '', \"Level\" integer NOT NULL DEFAULT 1, \"Remark\" text NULL, \"IsActive\" boolean NOT NULL DEFAULT true, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_Orgs_Code\" ON minisso.\"Orgs\" (\"Code\")");
         }
 
         if (!await db.Licenses.AnyAsync())
@@ -52,6 +57,7 @@ public static class Seeder
             await db.SaveChangesAsync();
         }
         await SeedRbacAsync(db);
+        await SeedOrgsAsync(db);
 
         if (!await db.Clients.AnyAsync())
         {
@@ -122,5 +128,23 @@ public static class Seeder
             Add("dealer@minisso.dev", "DEALER");
             await db.SaveChangesAsync();
         }
+    }
+
+    /// <summary>Seed cây tổ chức (port từ iNOS.InBrand: Mst_Org) — 1 tập đoàn → công ty → chi nhánh/đại lý.</summary>
+    private static async Task SeedOrgsAsync(AppDbContext db)
+    {
+        if (await db.Orgs.AnyAsync()) return;
+
+        var root = new Org { Code = "0", Name = "Tập đoàn iNOS", Remark = "Nút gốc" };
+        var north = new Org { Code = "10", Name = "Miền Bắc", ParentId = root.Id };
+        var south = new Org { Code = "20", Name = "Miền Nam", ParentId = root.Id };
+        var hn = new Org { Code = "11", Name = "Chi nhánh Hà Nội", ParentId = north.Id };
+        var hcm = new Org { Code = "21", Name = "Chi nhánh Hồ Chí Minh", ParentId = south.Id };
+        var dealer = new Org { Code = "211", Name = "Đại lý Đông Đô", ParentId = hcm.Id };
+        db.Orgs.AddRange(root, north, south, hn, hcm, dealer);
+        await db.SaveChangesAsync();
+
+        // Tính BuCode/BuPattern/Level cho toàn cây (tương ứng Mst_Org_UpdBU).
+        await new OrgService(db).RebuildPathsAsync();
     }
 }
