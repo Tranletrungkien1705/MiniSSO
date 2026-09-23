@@ -197,3 +197,43 @@ public class LoginAttempt
     public string? RemoteIp { get; set; }
     public DateTime AttemptedAt { get; set; } = DateTime.UtcNow;
 }
+
+// ── Phân hệ chức năng: Module → Function (port từ iNOS.InBrand: SysModule / SysFunction / SysFunctionInModule) ──
+// iNOS tổ chức menu/chức năng thành CÂY module (SysModule.ParentCode) và mỗi module gồm nhiều
+// chức năng (SysFunction) qua bảng nối SysFunctionInModule. Nhóm được cấp quyền tới MODULE (SysAccess),
+// và SysModuleManager.GetAllByUser suy ra "menu hiệu lực" của người dùng = các module (kèm chức năng)
+// mà mọi nhóm đang hoạt động của họ được cấp. MiniSSO trước đây chỉ có PermissionObject phẳng với
+// 1 cột Module dạng chuỗi — bổ sung cây module + chức năng để dựng menu theo người dùng.
+
+/// <summary>Phân hệ chức năng (tương ứng SysModule). Cây phân cấp qua <see cref="ParentId"/>.</summary>
+public class Module
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Code { get; set; } = "";        // mã module, vd "sso" (SysModule.Code)
+    public string Title { get; set; } = "";       // tiêu đề hiển thị (SysModule.Title)
+    public string? Description { get; set; }        // SysModule.Description
+    public string? ModuleType { get; set; }         // SysModule.ModuleType (vd "MENU", "PAGE")
+    public Guid? ParentId { get; set; }             // module cha (SysModule.ParentCode); null = gốc
+    public int SortOrder { get; set; }              // thứ tự hiển thị trong menu
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Chức năng trong 1 module (tương ứng SysFunction): 1 hành động/màn hình con.</summary>
+public class Function
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Code { get; set; } = "";        // mã chức năng, vd "user.create" (SysFunction.Code)
+    public string Description { get; set; } = "";  // SysFunction.Description
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Gán chức năng vào module (tương ứng SysFunctionInModule): quan hệ nhiều-nhiều Module ↔ Function.</summary>
+public class FunctionInModule
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ModuleId { get; set; }
+    public Guid FunctionId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

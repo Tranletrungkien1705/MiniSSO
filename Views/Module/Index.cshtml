@@ -1,0 +1,67 @@
+@model List<Module>
+@{
+    ViewData["Title"] = "Phân hệ chức năng";
+    var all = (List<Module>)ViewBag.Modules;
+    var functions = (List<Function>)ViewBag.Functions;
+    var moduleFunctions = (Dictionary<Guid, HashSet<string>>)ViewBag.ModuleFunctions;
+    var byId = all.ToDictionary(m => m.Id, m => m);
+}
+<div class="row g-3">
+    <div class="col-lg-4"><div class="card"><div class="card-body">
+        <h6 class="fw-bold mb-3">Thêm module</h6>
+        <form asp-action="Create" method="post">@Html.AntiForgeryToken()
+            <div class="mb-2"><input name="code" class="form-control" placeholder="Mã module * (vd sso.user)" required /></div>
+            <div class="mb-2"><input name="title" class="form-control" placeholder="Tiêu đề hiển thị" /></div>
+            <div class="mb-2"><input name="description" class="form-control" placeholder="Mô tả" /></div>
+            <div class="mb-2">
+                <select name="moduleType" class="form-select">
+                    <option value="MENU">MENU</option>
+                    <option value="PAGE">PAGE</option>
+                </select>
+            </div>
+            <div class="mb-2">
+                <select name="parentId" class="form-select">
+                    <option value="">— Module gốc —</option>
+                    @foreach (var m in all) { <option value="@m.Id">@m.Code · @m.Title</option> }
+                </select>
+            </div>
+            <div class="mb-3"><input name="sortOrder" type="number" class="form-control" value="0" placeholder="Thứ tự" /></div>
+            <button class="btn btn-primary w-100"><i class="bi bi-diagram-3 me-1"></i>Tạo module</button>
+        </form>
+        <p class="text-muted small mt-3 mb-0">Mô hình phân hệ port từ iNOS.InBrand: cây Module (SysModule) → chức năng (SysFunction) qua bảng nối SysFunctionInModule. Menu hiệu lực của người dùng suy ra từ quyền nhóm.</p>
+    </div></div></div>
+
+    <div class="col-lg-8">
+        @foreach (var m in Model)
+        {
+            var parent = m.ParentId != null && byId.TryGetValue(m.ParentId.Value, out var p) ? p : null;
+            var mfns = moduleFunctions.TryGetValue(m.Id, out var set) ? set : new HashSet<string>();
+            <div class="card mb-3"><div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div>
+                        <span class="fw-bold"><code>@m.Code</code></span>
+                        <span class="text-muted ms-2">@m.Title</span>
+                        @if (m.IsActive) { <span class="badge bg-success ms-2">bật</span> } else { <span class="badge bg-secondary ms-2">khóa</span> }
+                        @if (m.ModuleType != null) { <span class="badge bg-light text-dark ms-2">@m.ModuleType</span> }
+                        @if (parent != null) { <span class="badge bg-info text-dark ms-2">↳ @parent.Code</span> }
+                    </div>
+                    <form asp-action="Toggle" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@m.Id" /><button class="btn btn-sm btn-outline-secondary">@(m.IsActive ? "Khóa" : "Mở")</button></form>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(m.Description)) { <p class="text-muted small mb-2">@m.Description</p> }
+
+                <form asp-action="SaveFunctions" method="post">@Html.AntiForgeryToken()
+                    <input type="hidden" name="moduleId" value="@m.Id" />
+                    <div class="small fw-semibold text-uppercase text-muted mb-1">Chức năng (@mfns.Count) — lưu thay thế toàn bộ</div>
+                    @foreach (var f in functions)
+                    {
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" name="functionCodes" value="@f.Code" id="fn-@m.Id-@f.Id" @(mfns.Contains(f.Code) ? "checked" : "") />
+                            <label class="form-check-label small" for="fn-@m.Id-@f.Id"><code>@f.Code</code> <span class="text-muted">@f.Description</span></label>
+                        </div>
+                    }
+                    <button class="btn btn-sm btn-primary mt-2">Lưu chức năng</button>
+                </form>
+            </div></div>
+        }
+    </div>
+</div>

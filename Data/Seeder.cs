@@ -69,6 +69,21 @@ public static class Seeder
                 "ALTER TABLE minisso.\"Users\" ADD COLUMN IF NOT EXISTS \"OrgId\" uuid NULL");
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS \"IX_Users_OrgId\" ON minisso.\"Users\" (\"OrgId\")");
+            // Phân hệ chức năng Module → Function (thêm sau) — EnsureCreated không tạo trên Postgres đã tồn tại.
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE TABLE IF NOT EXISTS minisso.\"Modules\" (\"Id\" uuid PRIMARY KEY, \"Code\" text NOT NULL DEFAULT '', \"Title\" text NOT NULL DEFAULT '', \"Description\" text NULL, \"ModuleType\" text NULL, \"ParentId\" uuid NULL, \"SortOrder\" integer NOT NULL DEFAULT 0, \"IsActive\" boolean NOT NULL DEFAULT true, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_Modules_Code\" ON minisso.\"Modules\" (\"Code\")");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS \"IX_Modules_ParentId\" ON minisso.\"Modules\" (\"ParentId\")");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE TABLE IF NOT EXISTS minisso.\"Functions\" (\"Id\" uuid PRIMARY KEY, \"Code\" text NOT NULL DEFAULT '', \"Description\" text NOT NULL DEFAULT '', \"IsActive\" boolean NOT NULL DEFAULT true, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_Functions_Code\" ON minisso.\"Functions\" (\"Code\")");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE TABLE IF NOT EXISTS minisso.\"FunctionInModules\" (\"Id\" uuid PRIMARY KEY, \"ModuleId\" uuid NOT NULL, \"FunctionId\" uuid NOT NULL, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_FunctionInModules_ModuleId_FunctionId\" ON minisso.\"FunctionInModules\" (\"ModuleId\", \"FunctionId\")");
         }
 
         if (!await db.Licenses.AnyAsync())
@@ -88,6 +103,7 @@ public static class Seeder
         await SeedRbacAsync(db);
         await SeedOrgsAsync(db);
         await SeedDataScopeAsync(db);
+        await SeedModulesAsync(db);
 
         if (!await db.Clients.AnyAsync())
         {
@@ -197,6 +213,44 @@ public static class Seeder
         if (users.TryGetValue("sales@minisso.dev", out var sales) && orgs.TryGetValue("10", out var north)) sales.OrgId = north;
         if (users.TryGetValue("dealer@minisso.dev", out var dealer) && orgs.TryGetValue("211", out var dongDo)) dealer.OrgId = dongDo;
 
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Seed phân hệ chức năng (port từ iNOS.InBrand: SysModule / SysFunction / SysFunctionInModule).
+    /// Dựng cây module (sso → user/group/org) + chức năng con, và gắn chức năng vào module.
+    /// Module.Code trùng với PermissionObject.Module để "menu hiệu lực" suy ra được từ quyền nhóm.
+    /// </summary>
+    private static async Task SeedModulesAsync(AppDbContext db)
+    {
+        if (await db.Modules.AnyAsync()) return;
+
+        var sso = new Module { Code = "sso", Title = "Định danh & Phân quyền", ModuleType = "MENU", SortOrder = 1 };
+        var license = new Module { Code = "license", Title = "Bản quyền", ModuleType = "MENU", SortOrder = 2 };
+        var report = new Module { Code = "report", Title = "Báo cáo", ModuleType = "MENU", SortOrder = 3 };
+        var user = new Module { Code = "sso.user", Title = "Người dùng", ModuleType = "PAGE", ParentId = sso.Id, SortOrder = 1 };
+        var group = new Module { Code = "sso.group", Title = "Nhóm & Phân quyền", ModuleType = "PAGE", ParentId = sso.Id, SortOrder = 2 };
+        var org = new Module { Code = "sso.org", Title = "Tổ chức", ModuleType = "PAGE", ParentId = sso.Id, SortOrder = 3 };
+        db.Modules.AddRange(sso, license, report, user, group, org);
+        await db.SaveChangesAsync();
+
+        var fCreate = new Function { Code = "user.create", Description = "Tạo người dùng" };
+        var fLock = new Function { Code = "user.lock", Description = "Khoá/mở khoá tài khoản" };
+        var fReset = new Function { Code = "user.reset", Description = "Đặt lại mật khẩu" };
+        var fGrant = new Function { Code = "group.grant", Description = "Cấp/thu quyền nhóm" };
+        var fMember = new Function { Code = "group.member", Description = "Thêm/bớt thành viên nhóm" };
+        var fOrgCreate = new Function { Code = "org.create", Description = "Tạo đơn vị tổ chức" };
+        db.Functions.AddRange(fCreate, fLock, fReset, fGrant, fMember, fOrgCreate);
+        await db.SaveChangesAsync();
+
+        void Link(Module m, params Function[] fns)
+        {
+            foreach (var f in fns)
+                db.FunctionInModules.Add(new FunctionInModule { ModuleId = m.Id, FunctionId = f.Id });
+        }
+        Link(user, fCreate, fLock, fReset);
+        Link(group, fGrant, fMember);
+        Link(org, fOrgCreate);
         await db.SaveChangesAsync();
     }
 }

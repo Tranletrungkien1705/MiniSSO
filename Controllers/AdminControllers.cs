@@ -246,3 +246,54 @@ public class DataScopeController(AppDbContext db, DataScopeService scope) : Cont
         return RedirectToAction(nameof(Index));
     }
 }
+
+// Phân hệ chức năng: cây Module → Function (port từ iNOS.InBrand: SysModule / SysFunction / SysFunctionInModule).
+[Authorize]
+public class ModuleController(AppDbContext db, ModuleService modules) : Controller
+{
+    public async Task<IActionResult> Index()
+    {
+        var all = await db.Modules.OrderBy(m => m.SortOrder).ThenBy(m => m.Code).ToListAsync();
+        var links = await db.FunctionInModules.ToListAsync();
+        var functions = await db.Functions.OrderBy(f => f.Code).ToListAsync();
+        var fnById = functions.ToDictionary(f => f.Id);
+
+        ViewBag.Modules = all;
+        ViewBag.Functions = functions;
+        ViewBag.ModuleFunctions = links
+            .Where(l => fnById.ContainsKey(l.FunctionId))
+            .GroupBy(l => l.ModuleId)
+            .ToDictionary(g => g.Key, g => g.Select(l => fnById[l.FunctionId].Code).ToHashSet());
+        return View(all);
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(string code, string? title, string? description, string? moduleType, Guid? parentId, int sortOrder)
+    {
+        if (string.IsNullOrWhiteSpace(code)) { TempData["Error"] = "Cần mã module."; return RedirectToAction(nameof(Index)); }
+        var c = code.Trim();
+        if (await db.Modules.AnyAsync(m => m.Code == c)) { TempData["Error"] = "Mã module đã tồn tại."; return RedirectToAction(nameof(Index)); }
+        if (parentId != null && !await db.Modules.AnyAsync(m => m.Id == parentId)) { TempData["Error"] = "Module cha không tồn tại."; return RedirectToAction(nameof(Index)); }
+        db.Modules.Add(new Module { Code = c, Title = string.IsNullOrWhiteSpace(title) ? c : title!.Trim(), Description = description, ModuleType = moduleType, ParentId = parentId, SortOrder = sortOrder });
+        await db.SaveChangesAsync();
+        TempData["Success"] = "Đã tạo module.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Toggle(Guid id)
+    {
+        var m = await db.Modules.FirstOrDefaultAsync(x => x.Id == id);
+        if (m != null) { m.IsActive = !m.IsActive; await db.SaveChangesAsync(); }
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Lưu toàn bộ chức năng của module theo cơ chế thay-thế (port từ iNOS SysFunctionInModule save).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveFunctions(Guid moduleId, string[]? functionCodes)
+    {
+        var res = await modules.SetFunctionsAsync(moduleId, functionCodes ?? []);
+        if (!res.Ok) TempData["Error"] = res.Error; else TempData["Success"] = "Đã lưu chức năng module.";
+        return RedirectToAction(nameof(Index));
+    }
+}

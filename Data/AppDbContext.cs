@@ -18,6 +18,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<GroupAccess> GroupAccesses => Set<GroupAccess>();
     public DbSet<Org> Orgs => Set<Org>();
     public DbSet<LoginAttempt> LoginAttempts => Set<LoginAttempt>();
+    public DbSet<Module> Modules => Set<Module>();
+    public DbSet<Function> Functions => Set<Function>();
+    public DbSet<FunctionInModule> FunctionInModules => Set<FunctionInModule>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -33,5 +36,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<GroupAccess>(e => e.HasIndex(x => new { x.GroupId, x.ObjectId }).IsUnique());
         b.Entity<Org>(e => e.HasIndex(x => x.Code).IsUnique());
         b.Entity<LoginAttempt>(e => e.HasIndex(x => x.AttemptedAt));
+        b.Entity<Module>(e => { e.HasIndex(x => x.Code).IsUnique(); e.HasIndex(x => x.ParentId); });
+        b.Entity<Function>(e => e.HasIndex(x => x.Code).IsUnique());
+        b.Entity<FunctionInModule>(e => e.HasIndex(x => new { x.ModuleId, x.FunctionId }).IsUnique());
     }
 }

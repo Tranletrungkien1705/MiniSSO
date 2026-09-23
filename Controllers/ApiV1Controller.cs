@@ -13,7 +13,7 @@ namespace MiniSSO.Controllers;
 [ApiController]
 [Route("api/v1")]
 [Produces("application/json")]
-public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security, DataScopeService scope) : ControllerBase
+public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security, DataScopeService scope, ModuleService modules) : ControllerBase
 {
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard()
@@ -318,6 +318,67 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         return Ok(new { userId = id, orgId, allowed });
     }
 
+    // ── Phân hệ chức năng: Module → Function (port từ iNOS.InBrand: SysModule / SysFunction / SysFunctionInModule) ──
+    // Cây module + chức năng con; "menu hiệu lực" của người dùng suy ra từ quyền nhóm (SysModuleManager.GetAllByUser).
+    [HttpGet("modules")]
+    public async Task<IActionResult> Modules()
+    {
+        var list = await modules.AllWithFunctionsAsync();
+        return Ok(list.Select(x => new
+        {
+            x.Module.Id, x.Module.Code, x.Module.Title, x.Module.Description, x.Module.ModuleType,
+            x.Module.ParentId, x.Module.SortOrder, x.Module.IsActive,
+            functions = x.Functions.Select(f => new { f.Id, f.Code, f.Description })
+        }));
+    }
+
+    [HttpPost("modules")]
+    public async Task<IActionResult> CreateModule([FromBody] ModuleReq r)
+    {
+        if (string.IsNullOrWhiteSpace(r.Code)) return BadRequest(new { error = "Cần mã module." });
+        var code = r.Code.Trim();
+        if (await db.Modules.AnyAsync(m => m.Code == code)) return BadRequest(new { error = "Mã module đã tồn tại." });
+        if (r.ParentId != null && !await db.Modules.AnyAsync(m => m.Id == r.ParentId)) return BadRequest(new { error = "Module cha không tồn tại." });
+        var m = new Module { Code = code, Title = string.IsNullOrWhiteSpace(r.Title) ? code : r.Title!.Trim(), Description = r.Description, ModuleType = r.ModuleType, ParentId = r.ParentId, SortOrder = r.SortOrder };
+        db.Modules.Add(m); await db.SaveChangesAsync();
+        return Ok(new { id = m.Id });
+    }
+
+    // Toàn bộ nhánh con (kể cả chính nó) của 1 module.
+    [HttpGet("modules/{id:guid}/subtree")]
+    public async Task<IActionResult> ModuleSubtree(Guid id)
+    {
+        if (!await db.Modules.AnyAsync(m => m.Id == id)) return NotFound(new { error = "Không tìm thấy." });
+        var nodes = await modules.SubtreeAsync(id);
+        return Ok(nodes.Select(m => new { m.Id, m.Code, m.Title, m.ParentId, m.SortOrder }));
+    }
+
+    // Thay thế toàn bộ chức năng của module (↔ SysFunctionInModule save).
+    [HttpPut("modules/{id:guid}/functions")]
+    public async Task<IActionResult> SetModuleFunctions(Guid id, [FromBody] ModuleFunctionsReq r)
+    {
+        var res = await modules.SetFunctionsAsync(id, r.FunctionCodes ?? []);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
+        return Ok(new { ok = true, count = (r.FunctionCodes ?? []).Distinct().Count() });
+    }
+
+    // Menu hiệu lực của 1 người dùng (↔ SysModuleManager.GetAllByUser).
+    [HttpGet("users/{id:guid}/menu")]
+    public async Task<IActionResult> UserMenu(Guid id)
+    {
+        if (!await db.Users.AnyAsync(u => u.Id == id)) return NotFound(new { error = "Không tìm thấy." });
+        var list = await modules.MenuForUserAsync(id);
+        return Ok(new
+        {
+            userId = id,
+            modules = list.Select(x => new
+            {
+                x.Module.Code, x.Module.Title, x.Module.ModuleType, x.Module.ParentId, x.Module.SortOrder,
+                functions = x.Functions.Select(f => f.Code)
+            })
+        });
+    }
+
     // Thông tin OIDC discovery (để SPA hiển thị hướng dẫn tích hợp).
     [HttpGet("oidc-info")]
     public IActionResult OidcInfo()
@@ -344,3 +405,5 @@ public class GroupAccessSetReq { public List<string>? ObjectCodes { get; set; } 
 public class OrgReq { public string Code { get; set; } = ""; public string? Name { get; set; } public Guid? ParentId { get; set; } public string? Remark { get; set; } }
 public class UserScopeReq { public bool IsSysAdmin { get; set; } public Guid? OrgId { get; set; } }
 public class ResetPasswordReq { public string NewPassword { get; set; } = ""; }
+public class ModuleReq { public string Code { get; set; } = ""; public string? Title { get; set; } public string? Description { get; set; } public string? ModuleType { get; set; } public Guid? ParentId { get; set; } public int SortOrder { get; set; } }
+public class ModuleFunctionsReq { public List<string>? FunctionCodes { get; set; } }
