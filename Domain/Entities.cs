@@ -237,3 +237,41 @@ public class FunctionInModule
     public Guid FunctionId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+
+// ── Nhóm cột hiển thị: ViewGroupView → ViewColumnInGroup → ViewColumnView (port từ iNOS.InBrand) ──
+// iNOS cho phép cấu hình "cột hiển thị" (View_ColumnView) và gom chúng thành "nhóm cột hiển thị"
+// (View_GroupView) qua bảng nối View_ColumnInGroup. Khi lưu 1 nhóm, iNOS dùng cơ chế
+// "xoá sạch rồi ghi lại" (ViewColumnInGroupSaveX): xoá hết cột của nhóm rồi ghi lại đúng tập mới,
+// đồng thời kiểm tra nhóm tồn tại & đang hoạt động và mỗi cột phải tồn tại & đang hoạt động.
+// MiniSSO trước đây không có khái niệm cấu hình cột hiển thị theo nhóm.
+
+/// <summary>Cột hiển thị (tương ứng View_ColumnView): 1 cột dữ liệu có thể bật/tắt theo nhóm.</summary>
+public class ViewColumnView
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Code { get; set; } = "";        // mã cột (View_ColumnView.ColumnViewCode)
+    public string Name { get; set; } = "";        // tên hiển thị (View_ColumnView.ColumnViewName)
+    public string? Remark { get; set; }
+    public bool IsActive { get; set; } = true;     // View_ColumnView.FlagActive
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Nhóm cột hiển thị (tương ứng View_GroupView): tập hợp các cột hiển thị.</summary>
+public class ViewGroupView
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Code { get; set; } = "";        // mã nhóm (View_GroupView.GroupViewCode)
+    public string Name { get; set; } = "";        // tên hiển thị (View_GroupView.GroupViewName)
+    public string? Remark { get; set; }
+    public bool IsActive { get; set; } = true;     // View_GroupView.FlagActive
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Gán cột vào nhóm cột hiển thị (tương ứng View_ColumnInGroup): nhiều-nhiều ViewGroupView ↔ ViewColumnView.</summary>
+public class ViewColumnInGroup
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid GroupViewId { get; set; }
+    public Guid ColumnViewId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

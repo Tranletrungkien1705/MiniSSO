@@ -1,0 +1,75 @@
+@model List<ViewGroupView>
+@{
+    ViewData["Title"] = "Nhóm cột hiển thị";
+    var columns = (List<ViewColumnView>)ViewBag.Columns;
+    var groupColumns = (Dictionary<Guid, HashSet<string>>)ViewBag.GroupColumns;
+}
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card mb-3"><div class="card-body">
+            <h6 class="fw-bold mb-3">Thêm nhóm cột hiển thị</h6>
+            <form asp-action="Create" method="post">@Html.AntiForgeryToken()
+                <div class="mb-2"><input name="code" class="form-control" placeholder="Mã nhóm * (vd GRID_SALE)" required /></div>
+                <div class="mb-2"><input name="name" class="form-control" placeholder="Tên hiển thị" /></div>
+                <div class="mb-3"><input name="remark" class="form-control" placeholder="Ghi chú" /></div>
+                <button class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i>Tạo nhóm</button>
+            </form>
+        </div></div>
+
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Thêm cột hiển thị</h6>
+            <form asp-action="CreateColumn" method="post">@Html.AntiForgeryToken()
+                <div class="mb-2"><input name="code" class="form-control" placeholder="Mã cột * (vd col.code)" required /></div>
+                <div class="mb-2"><input name="name" class="form-control" placeholder="Tên hiển thị" /></div>
+                <div class="mb-3"><input name="remark" class="form-control" placeholder="Ghi chú" /></div>
+                <button class="btn btn-outline-primary w-100"><i class="bi bi-plus-lg me-1"></i>Tạo cột</button>
+            </form>
+            <hr />
+            <div class="small fw-semibold text-uppercase text-muted mb-2">Danh mục cột (@columns.Count)</div>
+            @foreach (var c in columns)
+            {
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <span><code>@c.Code</code> <span class="text-muted small">@c.Name</span>
+                        @if (c.IsActive) { <span class="badge bg-success ms-1">bật</span> } else { <span class="badge bg-secondary ms-1">khóa</span> }
+                    </span>
+                    <form asp-action="ToggleColumn" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@c.Id" /><button class="btn btn-sm btn-outline-secondary py-0">@(c.IsActive ? "Khóa" : "Mở")</button></form>
+                </div>
+            }
+            <p class="text-muted small mt-3 mb-0">Mô hình port từ iNOS.InBrand: cột hiển thị (View_ColumnView) gom vào nhóm (View_GroupView) qua bảng nối View_ColumnInGroup. Lưu nhóm theo cơ chế thay-thế toàn bộ.</p>
+        </div></div>
+    </div>
+
+    <div class="col-lg-8">
+        @foreach (var g in Model)
+        {
+            var gcols = groupColumns.TryGetValue(g.Id, out var set) ? set : new HashSet<string>();
+            <div class="card mb-3"><div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div>
+                        <span class="fw-bold"><code>@g.Code</code></span>
+                        <span class="text-muted ms-2">@g.Name</span>
+                        @if (g.IsActive) { <span class="badge bg-success ms-2">bật</span> } else { <span class="badge bg-secondary ms-2">khóa</span> }
+                    </div>
+                    <div class="d-flex gap-2">
+                        <form asp-action="Toggle" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@g.Id" /><button class="btn btn-sm btn-outline-secondary">@(g.IsActive ? "Khóa" : "Mở")</button></form>
+                        <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Xoá nhóm cột hiển thị này?');">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@g.Id" /><button class="btn btn-sm btn-outline-danger">Xoá</button></form>
+                    </div>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(g.Remark)) { <p class="text-muted small mb-2">@g.Remark</p> }
+
+                <form asp-action="SaveColumns" method="post">@Html.AntiForgeryToken()
+                    <input type="hidden" name="groupViewId" value="@g.Id" />
+                    <div class="small fw-semibold text-uppercase text-muted mb-1">Cột hiển thị (@gcols.Count) — lưu thay thế toàn bộ</div>
+                    @foreach (var c in columns)
+                    {
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" name="columnCodes" value="@c.Code" id="col-@g.Id-@c.Id" @(gcols.Contains(c.Code) ? "checked" : "") />
+                            <label class="form-check-label small" for="col-@g.Id-@c.Id"><code>@c.Code</code> <span class="text-muted">@c.Name</span></label>
+                        </div>
+                    }
+                    <button class="btn btn-sm btn-primary mt-2">Lưu cột hiển thị</button>
+                </form>
+            </div></div>
+        }
+    </div>
+</div>

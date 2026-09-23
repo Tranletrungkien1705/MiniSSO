@@ -13,7 +13,7 @@ namespace MiniSSO.Controllers;
 [ApiController]
 [Route("api/v1")]
 [Produces("application/json")]
-public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security, DataScopeService scope, ModuleService modules) : ControllerBase
+public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security, DataScopeService scope, ModuleService modules, ViewGroupService viewGroups) : ControllerBase
 {
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard()
@@ -379,6 +379,81 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         });
     }
 
+    // ── Nhóm cột hiển thị: ViewGroupView → ViewColumnInGroup → ViewColumnView (port từ iNOS.InBrand) ──
+    // Cấu hình "cột hiển thị" và gom thành nhóm; lưu nhóm theo cơ chế thay-thế toàn bộ (ViewColumnInGroupSaveX).
+    [HttpGet("view-columns")]
+    public async Task<IActionResult> ViewColumns()
+        => Ok((await db.ViewColumnViews.OrderBy(c => c.Code).ToListAsync())
+            .Select(c => new { c.Id, c.Code, c.Name, c.Remark, c.IsActive }));
+
+    [HttpPost("view-columns")]
+    public async Task<IActionResult> CreateViewColumn([FromBody] ViewColumnReq r)
+    {
+        if (string.IsNullOrWhiteSpace(r.Code)) return BadRequest(new { error = "Cần mã cột hiển thị." });
+        var code = r.Code.Trim();
+        if (await db.ViewColumnViews.AnyAsync(c => c.Code == code)) return BadRequest(new { error = "Mã cột hiển thị đã tồn tại." });
+        var c = new ViewColumnView { Code = code, Name = string.IsNullOrWhiteSpace(r.Name) ? code : r.Name!.Trim(), Remark = r.Remark };
+        db.ViewColumnViews.Add(c); await db.SaveChangesAsync();
+        return Ok(new { id = c.Id });
+    }
+
+    [HttpPost("view-columns/{id:guid}/toggle")]
+    public async Task<IActionResult> ToggleViewColumn(Guid id)
+    {
+        var c = await db.ViewColumnViews.FirstOrDefaultAsync(x => x.Id == id);
+        if (c == null) return NotFound(new { error = "Không tìm thấy." });
+        c.IsActive = !c.IsActive; await db.SaveChangesAsync();
+        return Ok(new { ok = true, isActive = c.IsActive });
+    }
+
+    [HttpGet("view-groups")]
+    public async Task<IActionResult> ViewGroups()
+    {
+        var list = await viewGroups.AllWithColumnsAsync();
+        return Ok(list.Select(x => new
+        {
+            x.Group.Id, x.Group.Code, x.Group.Name, x.Group.Remark, x.Group.IsActive,
+            columns = x.Columns.Select(c => new { c.Id, c.Code, c.Name })
+        }));
+    }
+
+    [HttpPost("view-groups")]
+    public async Task<IActionResult> CreateViewGroup([FromBody] ViewGroupReq r)
+    {
+        if (string.IsNullOrWhiteSpace(r.Code)) return BadRequest(new { error = "Cần mã nhóm cột hiển thị." });
+        var code = r.Code.Trim();
+        if (await db.ViewGroupViews.AnyAsync(g => g.Code == code)) return BadRequest(new { error = "Mã nhóm cột hiển thị đã tồn tại." });
+        var g = new ViewGroupView { Code = code, Name = string.IsNullOrWhiteSpace(r.Name) ? code : r.Name!.Trim(), Remark = r.Remark };
+        db.ViewGroupViews.Add(g); await db.SaveChangesAsync();
+        return Ok(new { id = g.Id });
+    }
+
+    [HttpPost("view-groups/{id:guid}/toggle")]
+    public async Task<IActionResult> ToggleViewGroup(Guid id)
+    {
+        var g = await db.ViewGroupViews.FirstOrDefaultAsync(x => x.Id == id);
+        if (g == null) return NotFound(new { error = "Không tìm thấy." });
+        g.IsActive = !g.IsActive; await db.SaveChangesAsync();
+        return Ok(new { ok = true, isActive = g.IsActive });
+    }
+
+    // Thay thế toàn bộ cột của nhóm (↔ ViewColumnInGroupSaveX).
+    [HttpPut("view-groups/{id:guid}/columns")]
+    public async Task<IActionResult> SetViewGroupColumns(Guid id, [FromBody] ViewGroupColumnsReq r)
+    {
+        var res = await viewGroups.SetColumnsAsync(id, r.ColumnCodes ?? []);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
+        return Ok(new { ok = true, count = (r.ColumnCodes ?? []).Distinct().Count() });
+    }
+
+    // Xoá nhóm cột hiển thị kèm dọn liên kết cột (↔ ViewColumnInGroupSaveX nhánh FlagIsDelete).
+    [HttpDelete("view-groups/{id:guid}")]
+    public async Task<IActionResult> DeleteViewGroup(Guid id)
+    {
+        if (!await viewGroups.DeleteGroupAsync(id)) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new { ok = true });
+    }
+
     // Thông tin OIDC discovery (để SPA hiển thị hướng dẫn tích hợp).
     [HttpGet("oidc-info")]
     public IActionResult OidcInfo()
@@ -407,3 +482,6 @@ public class UserScopeReq { public bool IsSysAdmin { get; set; } public Guid? Or
 public class ResetPasswordReq { public string NewPassword { get; set; } = ""; }
 public class ModuleReq { public string Code { get; set; } = ""; public string? Title { get; set; } public string? Description { get; set; } public string? ModuleType { get; set; } public Guid? ParentId { get; set; } public int SortOrder { get; set; } }
 public class ModuleFunctionsReq { public List<string>? FunctionCodes { get; set; } }
+public class ViewColumnReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Remark { get; set; } }
+public class ViewGroupReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Remark { get; set; } }
+public class ViewGroupColumnsReq { public List<string>? ColumnCodes { get; set; } }

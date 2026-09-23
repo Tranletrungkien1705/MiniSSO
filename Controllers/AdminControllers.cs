@@ -297,3 +297,81 @@ public class ModuleController(AppDbContext db, ModuleService modules) : Controll
         return RedirectToAction(nameof(Index));
     }
 }
+
+// Nhóm cột hiển thị: ViewGroupView → ViewColumnInGroup → ViewColumnView (port từ iNOS.InBrand).
+[Authorize]
+public class ViewGroupController(AppDbContext db, ViewGroupService viewGroups) : Controller
+{
+    public async Task<IActionResult> Index()
+    {
+        var groups = await db.ViewGroupViews.OrderBy(g => g.Code).ToListAsync();
+        var columns = await db.ViewColumnViews.OrderBy(c => c.Code).ToListAsync();
+        var links = await db.ViewColumnInGroups.ToListAsync();
+        var colById = columns.ToDictionary(c => c.Id);
+
+        ViewBag.Columns = columns;
+        ViewBag.GroupColumns = links
+            .Where(l => colById.ContainsKey(l.ColumnViewId))
+            .GroupBy(l => l.GroupViewId)
+            .ToDictionary(g => g.Key, g => g.Select(l => colById[l.ColumnViewId].Code).ToHashSet());
+        return View(groups);
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(string code, string? name, string? remark)
+    {
+        if (string.IsNullOrWhiteSpace(code)) { TempData["Error"] = "Cần mã nhóm cột hiển thị."; return RedirectToAction(nameof(Index)); }
+        var c = code.Trim();
+        if (await db.ViewGroupViews.AnyAsync(g => g.Code == c)) { TempData["Error"] = "Mã nhóm cột hiển thị đã tồn tại."; return RedirectToAction(nameof(Index)); }
+        db.ViewGroupViews.Add(new ViewGroupView { Code = c, Name = string.IsNullOrWhiteSpace(name) ? c : name!.Trim(), Remark = remark });
+        await db.SaveChangesAsync();
+        TempData["Success"] = "Đã tạo nhóm cột hiển thị.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateColumn(string code, string? name, string? remark)
+    {
+        if (string.IsNullOrWhiteSpace(code)) { TempData["Error"] = "Cần mã cột hiển thị."; return RedirectToAction(nameof(Index)); }
+        var c = code.Trim();
+        if (await db.ViewColumnViews.AnyAsync(x => x.Code == c)) { TempData["Error"] = "Mã cột hiển thị đã tồn tại."; return RedirectToAction(nameof(Index)); }
+        db.ViewColumnViews.Add(new ViewColumnView { Code = c, Name = string.IsNullOrWhiteSpace(name) ? c : name!.Trim(), Remark = remark });
+        await db.SaveChangesAsync();
+        TempData["Success"] = "Đã tạo cột hiển thị.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Toggle(Guid id)
+    {
+        var g = await db.ViewGroupViews.FirstOrDefaultAsync(x => x.Id == id);
+        if (g != null) { g.IsActive = !g.IsActive; await db.SaveChangesAsync(); }
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleColumn(Guid id)
+    {
+        var c = await db.ViewColumnViews.FirstOrDefaultAsync(x => x.Id == id);
+        if (c != null) { c.IsActive = !c.IsActive; await db.SaveChangesAsync(); }
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Lưu toàn bộ cột của nhóm theo cơ chế thay-thế (port từ iNOS ViewColumnInGroupSaveX).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveColumns(Guid groupViewId, string[]? columnCodes)
+    {
+        var res = await viewGroups.SetColumnsAsync(groupViewId, columnCodes ?? []);
+        if (!res.Ok) TempData["Error"] = res.Error; else TempData["Success"] = "Đã lưu cột hiển thị của nhóm.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Xoá nhóm cột hiển thị kèm dọn liên kết cột (port từ iNOS ViewColumnInGroupSaveX nhánh FlagIsDelete).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        if (await viewGroups.DeleteGroupAsync(id)) TempData["Success"] = "Đã xoá nhóm cột hiển thị.";
+        else TempData["Error"] = "Không tìm thấy nhóm cột hiển thị.";
+        return RedirectToAction(nameof(Index));
+    }
+}

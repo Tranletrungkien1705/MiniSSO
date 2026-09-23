@@ -84,6 +84,19 @@ public static class Seeder
                 "CREATE TABLE IF NOT EXISTS minisso.\"FunctionInModules\" (\"Id\" uuid PRIMARY KEY, \"ModuleId\" uuid NOT NULL, \"FunctionId\" uuid NOT NULL, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_FunctionInModules_ModuleId_FunctionId\" ON minisso.\"FunctionInModules\" (\"ModuleId\", \"FunctionId\")");
+            // Nhóm cột hiển thị (thêm sau) — EnsureCreated không tạo trên Postgres đã tồn tại.
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE TABLE IF NOT EXISTS minisso.\"ViewColumnViews\" (\"Id\" uuid PRIMARY KEY, \"Code\" text NOT NULL DEFAULT '', \"Name\" text NOT NULL DEFAULT '', \"Remark\" text NULL, \"IsActive\" boolean NOT NULL DEFAULT true, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_ViewColumnViews_Code\" ON minisso.\"ViewColumnViews\" (\"Code\")");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE TABLE IF NOT EXISTS minisso.\"ViewGroupViews\" (\"Id\" uuid PRIMARY KEY, \"Code\" text NOT NULL DEFAULT '', \"Name\" text NOT NULL DEFAULT '', \"Remark\" text NULL, \"IsActive\" boolean NOT NULL DEFAULT true, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_ViewGroupViews_Code\" ON minisso.\"ViewGroupViews\" (\"Code\")");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE TABLE IF NOT EXISTS minisso.\"ViewColumnInGroups\" (\"Id\" uuid PRIMARY KEY, \"GroupViewId\" uuid NOT NULL, \"ColumnViewId\" uuid NOT NULL, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_ViewColumnInGroups_GroupViewId_ColumnViewId\" ON minisso.\"ViewColumnInGroups\" (\"GroupViewId\", \"ColumnViewId\")");
         }
 
         if (!await db.Licenses.AnyAsync())
@@ -104,6 +117,7 @@ public static class Seeder
         await SeedOrgsAsync(db);
         await SeedDataScopeAsync(db);
         await SeedModulesAsync(db);
+        await SeedViewGroupsAsync(db);
 
         if (!await db.Clients.AnyAsync())
         {
@@ -251,6 +265,37 @@ public static class Seeder
         Link(user, fCreate, fLock, fReset);
         Link(group, fGrant, fMember);
         Link(org, fOrgCreate);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Seed nhóm cột hiển thị (port từ iNOS.InBrand: View_ColumnView / View_GroupView / View_ColumnInGroup).
+    /// Tạo danh mục cột hiển thị + 2 nhóm (GRID_SALE, GRID_ADMIN) và gán cột vào nhóm.
+    /// </summary>
+    private static async Task SeedViewGroupsAsync(AppDbContext db)
+    {
+        if (await db.ViewColumnViews.AnyAsync()) return;
+
+        var cCode = new ViewColumnView { Code = "col.code", Name = "Mã" };
+        var cName = new ViewColumnView { Code = "col.name", Name = "Tên" };
+        var cOrg = new ViewColumnView { Code = "col.org", Name = "Đơn vị" };
+        var cStatus = new ViewColumnView { Code = "col.status", Name = "Trạng thái" };
+        var cCreated = new ViewColumnView { Code = "col.created", Name = "Ngày tạo" };
+        db.ViewColumnViews.AddRange(cCode, cName, cOrg, cStatus, cCreated);
+        await db.SaveChangesAsync();
+
+        var sale = new ViewGroupView { Code = "GRID_SALE", Name = "Lưới kinh doanh" };
+        var admin = new ViewGroupView { Code = "GRID_ADMIN", Name = "Lưới quản trị" };
+        db.ViewGroupViews.AddRange(sale, admin);
+        await db.SaveChangesAsync();
+
+        void Link(ViewGroupView g, params ViewColumnView[] cols)
+        {
+            foreach (var c in cols)
+                db.ViewColumnInGroups.Add(new ViewColumnInGroup { GroupViewId = g.Id, ColumnViewId = c.Id });
+        }
+        Link(sale, cCode, cName, cStatus);
+        Link(admin, cCode, cName, cOrg, cStatus, cCreated);
         await db.SaveChangesAsync();
     }
 }

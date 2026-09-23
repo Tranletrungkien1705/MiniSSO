@@ -21,6 +21,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Module> Modules => Set<Module>();
     public DbSet<Function> Functions => Set<Function>();
     public DbSet<FunctionInModule> FunctionInModules => Set<FunctionInModule>();
+    public DbSet<ViewColumnView> ViewColumnViews => Set<ViewColumnView>();
+    public DbSet<ViewGroupView> ViewGroupViews => Set<ViewGroupView>();
+    public DbSet<ViewColumnInGroup> ViewColumnInGroups => Set<ViewColumnInGroup>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -39,5 +42,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<Module>(e => { e.HasIndex(x => x.Code).IsUnique(); e.HasIndex(x => x.ParentId); });
         b.Entity<Function>(e => e.HasIndex(x => x.Code).IsUnique());
         b.Entity<FunctionInModule>(e => e.HasIndex(x => new { x.ModuleId, x.FunctionId }).IsUnique());
+        b.Entity<ViewColumnView>(e => e.HasIndex(x => x.Code).IsUnique());
+        b.Entity<ViewGroupView>(e => e.HasIndex(x => x.Code).IsUnique());
+        b.Entity<ViewColumnInGroup>(e => e.HasIndex(x => new { x.GroupViewId, x.ColumnViewId }).IsUnique());
     }
 }
