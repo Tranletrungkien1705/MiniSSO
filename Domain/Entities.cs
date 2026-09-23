@@ -275,3 +275,20 @@ public class ViewColumnInGroup
     public Guid ColumnViewId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+
+// ── Đội người dùng: Sys_UserTeam (port từ iNOS.InBrand) ──
+// iNOS có bảng Sys_UserTeam (SysUserTeam: TeamCode PK, DLCode, TeamName, FlagActive) — "đội" thuộc
+// một đại lý/đơn vị (DLCode). Đây là khái niệm TỔ CHỨC (đội trong đơn vị), KHÁC với Group (nhóm quyền):
+// Group gom người dùng để cấp quyền, còn Team gom người dùng theo đơn vị nghiệp vụ. MiniSSO trước đây
+// không có khái niệm "đội".
+
+/// <summary>Đội người dùng (tương ứng Sys_UserTeam): một đội thuộc 1 đơn vị tổ chức.</summary>
+public class UserTeam
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Code { get; set; } = "";        // mã đội (Sys_UserTeam.TeamCode) — duy nhất
+    public string Name { get; set; } = "";        // tên đội (Sys_UserTeam.TeamName)
+    public Guid? OrgId { get; set; }               // đơn vị của đội (Sys_UserTeam.DLCode); null = đội toàn cục
+    public bool IsActive { get; set; } = true;     // Sys_UserTeam.FlagActive
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

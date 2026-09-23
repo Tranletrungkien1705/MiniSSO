@@ -1,0 +1,60 @@
+@model List<UserTeam>
+@{
+    ViewData["Title"] = "Đội người dùng";
+    var orgs = (List<Org>)ViewBag.Orgs;
+    var orgById = orgs.ToDictionary(o => o.Id, o => o);
+}
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Thêm đội người dùng</h6>
+            <form asp-action="Create" method="post">@Html.AntiForgeryToken()
+                <div class="mb-2"><input name="code" class="form-control" placeholder="Mã đội * (vd TEAM_HN1)" required /></div>
+                <div class="mb-2"><input name="name" class="form-control" placeholder="Tên đội" /></div>
+                <div class="mb-3">
+                    <select name="orgId" class="form-select">
+                        <option value="">— Không gắn đơn vị (đội toàn cục) —</option>
+                        @foreach (var o in orgs)
+                        {
+                            <option value="@o.Id">@o.BuCode · @o.Name</option>
+                        }
+                    </select>
+                </div>
+                <button class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i>Tạo đội</button>
+            </form>
+            <p class="text-muted small mt-3 mb-0">Mô hình port từ iNOS.InBrand: bảng <code>Sys_UserTeam</code> (TeamCode, DLCode, TeamName, FlagActive). "Đội" thuộc một đơn vị tổ chức — khác với <b>Nhóm</b> (nhóm quyền).</p>
+        </div></div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card"><div class="card-body">
+            <h6 class="fw-bold mb-3">Danh sách đội (@Model.Count)</h6>
+            @if (Model.Count == 0)
+            {
+                <p class="text-muted mb-0">Chưa có đội nào.</p>
+            }
+            else
+            {
+                <table class="table align-middle mb-0">
+                    <thead><tr><th>Mã đội</th><th>Tên đội</th><th>Đơn vị</th><th>Trạng thái</th><th class="text-end">Thao tác</th></tr></thead>
+                    <tbody>
+                    @foreach (var t in Model)
+                    {
+                        var orgName = t.OrgId != null && orgById.TryGetValue(t.OrgId.Value, out var o) ? $"{o.BuCode} · {o.Name}" : "—";
+                        <tr>
+                            <td><code>@t.Code</code></td>
+                            <td>@t.Name</td>
+                            <td class="text-muted small">@orgName</td>
+                            <td>@if (t.IsActive) { <span class="badge bg-success">bật</span> } else { <span class="badge bg-secondary">khóa</span> }</td>
+                            <td class="text-end">
+                                <form asp-action="Toggle" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@t.Id" /><button class="btn btn-sm btn-outline-secondary py-0">@(t.IsActive ? "Khóa" : "Mở")</button></form>
+                                <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Xoá đội này?');">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@t.Id" /><button class="btn btn-sm btn-outline-danger py-0">Xoá</button></form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div></div>
+    </div>
+</div>

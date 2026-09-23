@@ -375,3 +375,45 @@ public class ViewGroupController(AppDbContext db, ViewGroupService viewGroups) :
         return RedirectToAction(nameof(Index));
     }
 }
+
+// Đội người dùng: Sys_UserTeam (port từ iNOS.InBrand) — đội thuộc 1 đơn vị tổ chức.
+[Authorize]
+public class UserTeamController(AppDbContext db, UserTeamService teams) : Controller
+{
+    public async Task<IActionResult> Index()
+    {
+        ViewBag.Orgs = await db.Orgs.OrderBy(o => o.BuCode).ToListAsync();
+        return View(await teams.AllAsync());
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(string code, string? name, Guid? orgId)
+    {
+        var res = await teams.CreateAsync(code, name, orgId);
+        if (!res.Ok) TempData["Error"] = res.Error; else TempData["Success"] = "Đã tạo đội.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Update(Guid id, string? name, Guid? orgId)
+    {
+        var res = await teams.UpdateAsync(id, name, orgId);
+        if (!res.Ok) TempData["Error"] = res.Error; else TempData["Success"] = "Đã cập nhật đội.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Toggle(Guid id)
+    {
+        await teams.ToggleAsync(id);
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        if (await teams.DeleteAsync(id)) TempData["Success"] = "Đã xoá đội.";
+        else TempData["Error"] = "Không tìm thấy đội.";
+        return RedirectToAction(nameof(Index));
+    }
+}

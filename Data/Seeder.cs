@@ -97,6 +97,13 @@ public static class Seeder
                 "CREATE TABLE IF NOT EXISTS minisso.\"ViewColumnInGroups\" (\"Id\" uuid PRIMARY KEY, \"GroupViewId\" uuid NOT NULL, \"ColumnViewId\" uuid NOT NULL, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_ViewColumnInGroups_GroupViewId_ColumnViewId\" ON minisso.\"ViewColumnInGroups\" (\"GroupViewId\", \"ColumnViewId\")");
+            // Đội người dùng (thêm sau) — EnsureCreated không tạo trên Postgres đã tồn tại.
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE TABLE IF NOT EXISTS minisso.\"UserTeams\" (\"Id\" uuid PRIMARY KEY, \"Code\" text NOT NULL DEFAULT '', \"Name\" text NOT NULL DEFAULT '', \"OrgId\" uuid NULL, \"IsActive\" boolean NOT NULL DEFAULT true, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_UserTeams_Code\" ON minisso.\"UserTeams\" (\"Code\")");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS \"IX_UserTeams_OrgId\" ON minisso.\"UserTeams\" (\"OrgId\")");
         }
 
         if (!await db.Licenses.AnyAsync())
@@ -118,6 +125,7 @@ public static class Seeder
         await SeedDataScopeAsync(db);
         await SeedModulesAsync(db);
         await SeedViewGroupsAsync(db);
+        await SeedUserTeamsAsync(db);
 
         if (!await db.Clients.AnyAsync())
         {
@@ -296,6 +304,28 @@ public static class Seeder
         }
         Link(sale, cCode, cName, cStatus);
         Link(admin, cCode, cName, cOrg, cStatus, cCreated);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Seed đội người dùng (port từ iNOS.InBrand: Sys_UserTeam).
+    /// Tạo vài đội gắn vào các đơn vị tổ chức sẵn có (Miền Bắc, Đại lý Đông Đô) + 1 đội toàn cục.
+    /// </summary>
+    private static async Task SeedUserTeamsAsync(AppDbContext db)
+    {
+        if (await db.UserTeams.AnyAsync()) return;
+
+        var orgs = await db.Orgs.ToDictionaryAsync(o => o.Code, o => o.Id);
+        var teams = new List<UserTeam>
+        {
+            new() { Code = "TEAM_HN1", Name = "Đội kinh doanh Hà Nội 1" },
+            new() { Code = "TEAM_HN2", Name = "Đội kinh doanh Hà Nội 2" },
+            new() { Code = "TEAM_DD1", Name = "Đội đại lý Đông Đô" },
+        };
+        if (orgs.TryGetValue("10", out var north)) teams[0].OrgId = north;
+        if (orgs.TryGetValue("10", out var north2)) teams[1].OrgId = north2;
+        if (orgs.TryGetValue("211", out var dongDo)) teams[2].OrgId = dongDo;
+        db.UserTeams.AddRange(teams);
         await db.SaveChangesAsync();
     }
 }

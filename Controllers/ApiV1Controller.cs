@@ -13,7 +13,7 @@ namespace MiniSSO.Controllers;
 [ApiController]
 [Route("api/v1")]
 [Produces("application/json")]
-public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security, DataScopeService scope, ModuleService modules, ViewGroupService viewGroups) : ControllerBase
+public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security, DataScopeService scope, ModuleService modules, ViewGroupService viewGroups, UserTeamService teams) : ControllerBase
 {
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard()
@@ -454,6 +454,45 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         return Ok(new { ok = true });
     }
 
+    // ── Đội người dùng: Sys_UserTeam (port từ iNOS.InBrand) ──
+    // "Đội" thuộc 1 đơn vị tổ chức (DLCode) — khác với Group (nhóm quyền).
+    [HttpGet("user-teams")]
+    public async Task<IActionResult> UserTeams([FromQuery] Guid? orgId)
+    {
+        var list = orgId == null ? await teams.AllAsync() : await teams.ByOrgAsync(orgId.Value);
+        return Ok(list.Select(t => new { t.Id, t.Code, t.Name, t.OrgId, t.IsActive, t.CreatedAt }));
+    }
+
+    [HttpPost("user-teams")]
+    public async Task<IActionResult> CreateUserTeam([FromBody] UserTeamReq r)
+    {
+        var res = await teams.CreateAsync(r.Code, r.Name, r.OrgId);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
+        return Ok(new { ok = true });
+    }
+
+    [HttpPut("user-teams/{id:guid}")]
+    public async Task<IActionResult> UpdateUserTeam(Guid id, [FromBody] UserTeamReq r)
+    {
+        var res = await teams.UpdateAsync(id, r.Name, r.OrgId);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
+        return Ok(new { ok = true });
+    }
+
+    [HttpPost("user-teams/{id:guid}/toggle")]
+    public async Task<IActionResult> ToggleUserTeam(Guid id)
+    {
+        if (!await teams.ToggleAsync(id)) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new { ok = true });
+    }
+
+    [HttpDelete("user-teams/{id:guid}")]
+    public async Task<IActionResult> DeleteUserTeam(Guid id)
+    {
+        if (!await teams.DeleteAsync(id)) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new { ok = true });
+    }
+
     // Thông tin OIDC discovery (để SPA hiển thị hướng dẫn tích hợp).
     [HttpGet("oidc-info")]
     public IActionResult OidcInfo()
@@ -485,3 +524,4 @@ public class ModuleFunctionsReq { public List<string>? FunctionCodes { get; set;
 public class ViewColumnReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Remark { get; set; } }
 public class ViewGroupReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Remark { get; set; } }
 public class ViewGroupColumnsReq { public List<string>? ColumnCodes { get; set; } }
+public class UserTeamReq { public string Code { get; set; } = ""; public string? Name { get; set; } public Guid? OrgId { get; set; } }
