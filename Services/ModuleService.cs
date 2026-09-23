@@ -122,4 +122,58 @@ public sealed class ModuleService(AppDbContext db)
         }
         return result.OrderBy(m => m.SortOrder).ThenBy(m => m.Code).ToList();
     }
+
+    // ── Gán module trực tiếp cho nhóm (port từ iNOS.InBrand: Sys_Access = GroupCode + ModuleCode) ──
+    // iNOS nối TRỰC TIẾP nhóm ↔ module qua bảng Sys_Access. Màn hình SysGroupController.GetSysModule
+    // liệt kê TẤT CẢ module kèm cờ "đã gán cho nhóm này chưa" (SysAccessService.GetAllAccessByGroupCode),
+    // và SaveModuleInGroup → SysAccessSave_New20171101 lưu theo cơ chế "xoá sạch rồi ghi lại".
+
+    /// <summary>
+    /// Mã các module ĐANG được gán cho 1 nhóm (↔ SysAccessService.GetAllAccessByGroupCode).
+    /// Trả về rỗng nếu nhóm không tồn tại.
+    /// </summary>
+    public async Task<List<string>> GrantedModuleCodesAsync(Guid groupId)
+    {
+        if (!await db.Groups.AnyAsync(g => g.Id == groupId)) return [];
+        var moduleIds = await db.GroupModuleAccesses.Where(a => a.GroupId == groupId).Select(a => a.ModuleId).ToListAsync();
+        return await db.Modules.Where(m => moduleIds.Contains(m.Id)).OrderBy(m => m.Code).Select(m => m.Code).ToListAsync();
+    }
+
+    /// <summary>
+    /// TẤT CẢ module kèm cờ "đã gán cho nhóm này chưa" (↔ SysGroupController.GetSysModule):
+    /// dựng màn hình "Gán module vào nhóm" — mỗi module có <c>Granted</c> = nhóm đang được cấp module đó.
+    /// Trả về rỗng nếu nhóm không tồn tại.
+    /// </summary>
+    public async Task<List<ModuleGrant>> ModulesForGroupAsync(Guid groupId)
+    {
+        if (!await db.Groups.AnyAsync(g => g.Id == groupId)) return [];
+        var grantedIds = (await db.GroupModuleAccesses.Where(a => a.GroupId == groupId).Select(a => a.ModuleId).ToListAsync()).ToHashSet();
+        var modules = await db.Modules.OrderBy(m => m.SortOrder).ThenBy(m => m.Code).ToListAsync();
+        return modules.Select(m => new ModuleGrant(m, grantedIds.Contains(m.Id))).ToList();
+    }
+
+    /// <summary>
+    /// Thay thế toàn bộ module được gán cho nhóm (↔ SysAccessSave_New20171101, cơ chế clear-all → insert-all).
+    /// Xoá hết liên kết hiện có rồi ghi lại đúng tập <paramref name="moduleCodes"/>.
+    /// Ràng buộc: nhóm phải tồn tại; mọi module phải tồn tại (↔ MstModuleCheckDB).
+    /// </summary>
+    public async Task<GroupResult> SetGroupModulesAsync(Guid groupId, IEnumerable<string> moduleCodes)
+    {
+        if (!await db.Groups.AnyAsync(g => g.Id == groupId)) return GroupResult.Fail("Không tìm thấy nhóm.");
+
+        var codes = moduleCodes.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim()).Distinct().ToList();
+        var mods = await db.Modules.Where(m => codes.Contains(m.Code)).ToListAsync();
+        if (mods.Count != codes.Count) return GroupResult.Fail("Có module không tồn tại.");
+
+        // Clear-all → insert-all.
+        var existing = await db.GroupModuleAccesses.Where(a => a.GroupId == groupId).ToListAsync();
+        db.GroupModuleAccesses.RemoveRange(existing);
+        foreach (var m in mods)
+            db.GroupModuleAccesses.Add(new GroupModuleAccess { GroupId = groupId, ModuleId = m.Id });
+        await db.SaveChangesAsync();
+        return GroupResult.Success();
+    }
 }
+
+/// <summary>1 module kèm cờ đã gán cho nhóm hay chưa (dùng cho màn hình "Gán module vào nhóm").</summary>
+public sealed record ModuleGrant(Module Module, bool Granted);

@@ -526,3 +526,31 @@ public class GroupMemberController(AppDbContext db, GroupService groups) : Contr
         return RedirectToAction(nameof(Index), new { groupId });
     }
 }
+
+// Gán module trực tiếp cho nhóm (port từ iNOS.InBrand: Sys_Access = GroupCode + ModuleCode).
+// Màn hình "Gán module vào nhóm" của iNOS (SysGroupController.GetSysModule) liệt kê TẤT CẢ module
+// kèm cờ "đã gán cho nhóm này chưa" (SysAccessService.GetAllAccessByGroupCode); SaveModuleInGroup →
+// SysAccessSave_New20171101 lưu theo cơ chế thay-thế toàn bộ (clear-all → insert-all).
+[Authorize]
+public class GroupModuleController(AppDbContext db, ModuleService modules) : Controller
+{
+    public async Task<IActionResult> Index(Guid? groupId)
+    {
+        var allGroups = await db.Groups.OrderBy(g => g.Code).ToListAsync();
+        var selected = groupId != null ? allGroups.FirstOrDefault(g => g.Id == groupId) : allGroups.FirstOrDefault();
+
+        ViewBag.Groups = allGroups;
+        ViewBag.Selected = selected;
+        ViewBag.Modules = selected != null ? await modules.ModulesForGroupAsync(selected.Id) : new List<ModuleGrant>();
+        return View();
+    }
+
+    // Lưu toàn bộ module gán cho nhóm theo cơ chế thay-thế (↔ SysAccessSave_New20171101).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveModules(Guid groupId, string[]? moduleCodes)
+    {
+        var res = await modules.SetGroupModulesAsync(groupId, moduleCodes ?? []);
+        if (!res.Ok) TempData["Error"] = res.Error; else TempData["Success"] = "Đã lưu module cho nhóm.";
+        return RedirectToAction(nameof(Index), new { groupId });
+    }
+}

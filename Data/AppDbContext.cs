@@ -16,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
     public DbSet<PermissionObject> PermissionObjects => Set<PermissionObject>();
     public DbSet<GroupAccess> GroupAccesses => Set<GroupAccess>();
+    public DbSet<GroupModuleAccess> GroupModuleAccesses => Set<GroupModuleAccess>();
     public DbSet<Org> Orgs => Set<Org>();
     public DbSet<LoginAttempt> LoginAttempts => Set<LoginAttempt>();
     public DbSet<Module> Modules => Set<Module>();
@@ -39,6 +40,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<GroupMember>(e => e.HasIndex(x => new { x.GroupId, x.UserId }).IsUnique());
         b.Entity<PermissionObject>(e => e.HasIndex(x => x.Code).IsUnique());
         b.Entity<GroupAccess>(e => e.HasIndex(x => new { x.GroupId, x.ObjectId }).IsUnique());
+        b.Entity<GroupModuleAccess>(e => e.HasIndex(x => new { x.GroupId, x.ModuleId }).IsUnique());
         b.Entity<Org>(e => e.HasIndex(x => x.Code).IsUnique());
         b.Entity<LoginAttempt>(e => e.HasIndex(x => x.AttemptedAt));
         b.Entity<Module>(e => { e.HasIndex(x => x.Code).IsUnique(); e.HasIndex(x => x.ParentId); });

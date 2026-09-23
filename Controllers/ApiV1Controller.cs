@@ -425,6 +425,34 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         });
     }
 
+    // ── Gán module trực tiếp cho nhóm (port từ iNOS.InBrand: Sys_Access = GroupCode + ModuleCode) ──
+    // Màn hình SysGroupController.GetSysModule: liệt kê TẤT CẢ module kèm cờ "đã gán cho nhóm này chưa"
+    // (SysAccessService.GetAllAccessByGroupCode); SaveModuleInGroup → SysAccessSave_New20171101 lưu thay-thế.
+    [HttpGet("groups/{id:guid}/modules")]
+    public async Task<IActionResult> GroupModules(Guid id)
+    {
+        if (!await db.Groups.AnyAsync(g => g.Id == id)) return NotFound(new { error = "Không tìm thấy nhóm." });
+        var list = await modules.ModulesForGroupAsync(id);
+        return Ok(list.Select(x => new { x.Module.Id, x.Module.Code, x.Module.Title, x.Module.ModuleType, x.Module.ParentId, x.Module.SortOrder, x.Granted }));
+    }
+
+    // Mã các module ĐANG được gán cho nhóm (↔ GetAllAccessByGroupCode).
+    [HttpGet("groups/{id:guid}/module-codes")]
+    public async Task<IActionResult> GroupModuleCodes(Guid id)
+    {
+        if (!await db.Groups.AnyAsync(g => g.Id == id)) return NotFound(new { error = "Không tìm thấy nhóm." });
+        return Ok(new { groupId = id, moduleCodes = await modules.GrantedModuleCodesAsync(id) });
+    }
+
+    // Thay thế toàn bộ module gán cho nhóm (↔ SysAccessSave_New20171101, clear-all → insert-all).
+    [HttpPut("groups/{id:guid}/modules")]
+    public async Task<IActionResult> SetGroupModules(Guid id, [FromBody] GroupModulesReq r)
+    {
+        var res = await modules.SetGroupModulesAsync(id, r.ModuleCodes ?? []);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
+        return Ok(new { ok = true, count = (r.ModuleCodes ?? []).Distinct().Count() });
+    }
+
     // ── Nhóm cột hiển thị: ViewGroupView → ViewColumnInGroup → ViewColumnView (port từ iNOS.InBrand) ──
     // Cấu hình "cột hiển thị" và gom thành nhóm; lưu nhóm theo cơ chế thay-thế toàn bộ (ViewColumnInGroupSaveX).
     [HttpGet("view-columns")]
@@ -629,6 +657,7 @@ public class ResetPasswordReq { public string NewPassword { get; set; } = ""; }
 public class ChangePasswordReq { public string? CurrentPassword { get; set; } public string? NewPassword { get; set; } public string? ConfirmPassword { get; set; } }
 public class ModuleReq { public string Code { get; set; } = ""; public string? Title { get; set; } public string? Description { get; set; } public string? ModuleType { get; set; } public Guid? ParentId { get; set; } public int SortOrder { get; set; } }
 public class ModuleFunctionsReq { public List<string>? FunctionCodes { get; set; } }
+public class GroupModulesReq { public List<string>? ModuleCodes { get; set; } }
 public class ViewColumnReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Remark { get; set; } }
 public class ViewGroupReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Remark { get; set; } }
 public class ViewGroupColumnsReq { public List<string>? ColumnCodes { get; set; } }

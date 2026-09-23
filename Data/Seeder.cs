@@ -40,6 +40,11 @@ public static class Seeder
                 "CREATE TABLE IF NOT EXISTS minisso.\"GroupAccesses\" (\"Id\" uuid PRIMARY KEY, \"GroupId\" uuid NOT NULL, \"ObjectId\" uuid NOT NULL, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_GroupAccesses_GroupId_ObjectId\" ON minisso.\"GroupAccesses\" (\"GroupId\", \"ObjectId\")");
+            // Gán module trực tiếp cho nhóm (thêm sau) — EnsureCreated không tạo trên Postgres đã tồn tại.
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE TABLE IF NOT EXISTS minisso.\"GroupModuleAccesses\" (\"Id\" uuid PRIMARY KEY, \"GroupId\" uuid NOT NULL, \"ModuleId\" uuid NOT NULL, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_GroupModuleAccesses_GroupId_ModuleId\" ON minisso.\"GroupModuleAccesses\" (\"GroupId\", \"ModuleId\")");
             // Cây tổ chức (thêm sau) — EnsureCreated không tạo trên Postgres đã tồn tại.
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE TABLE IF NOT EXISTS minisso.\"Orgs\" (\"Id\" uuid PRIMARY KEY, \"Code\" text NOT NULL DEFAULT '', \"Name\" text NOT NULL DEFAULT '', \"ParentId\" uuid NULL, \"BuCode\" text NOT NULL DEFAULT '', \"BuPattern\" text NOT NULL DEFAULT '', \"Level\" integer NOT NULL DEFAULT 1, \"Remark\" text NULL, \"IsActive\" boolean NOT NULL DEFAULT true, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
@@ -124,6 +129,7 @@ public static class Seeder
         await SeedOrgsAsync(db);
         await SeedDataScopeAsync(db);
         await SeedModulesAsync(db);
+        await SeedGroupModulesAsync(db);
         await SeedViewGroupsAsync(db);
         await SeedUserTeamsAsync(db);
 
@@ -273,6 +279,28 @@ public static class Seeder
         Link(user, fCreate, fLock, fReset);
         Link(group, fGrant, fMember);
         Link(org, fOrgCreate);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Seed gán module trực tiếp cho nhóm (port từ iNOS.InBrand: Sys_Access = GroupCode + ModuleCode).
+    /// SYSADMIN được cấp toàn bộ module; SALES chỉ được cấp module báo cáo.
+    /// </summary>
+    private static async Task SeedGroupModulesAsync(AppDbContext db)
+    {
+        if (await db.GroupModuleAccesses.AnyAsync()) return;
+
+        var grps = await db.Groups.ToDictionaryAsync(g => g.Code, g => g.Id);
+        var mods = await db.Modules.ToDictionaryAsync(m => m.Code, m => m.Id);
+        void Grant(string group, params string[] codes)
+        {
+            if (!grps.TryGetValue(group, out var gid)) return;
+            foreach (var c in codes)
+                if (mods.TryGetValue(c, out var mid))
+                    db.GroupModuleAccesses.Add(new GroupModuleAccess { GroupId = gid, ModuleId = mid });
+        }
+        Grant("SYSADMIN", "sso", "license", "report", "sso.user", "sso.group", "sso.org");
+        Grant("SALES", "report");
         await db.SaveChangesAsync();
     }
 

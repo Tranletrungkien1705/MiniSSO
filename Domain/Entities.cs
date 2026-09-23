@@ -161,6 +161,23 @@ public class GroupAccess
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+// ── Gán module trực tiếp cho nhóm (port từ iNOS.InBrand: Sys_Access = GroupCode + ModuleCode) ──
+// iNOS có bảng Sys_Access nối TRỰC TIẾP nhóm ↔ module (GroupCode, ModuleCode). Màn hình
+// SysGroupController.GetSysModule liệt kê TẤT CẢ module kèm cờ "đã gán cho nhóm này chưa"
+// (SysAccessService.GetAllAccessByGroupCode), và SaveModuleInGroup → SysAccessSave_New20171101
+// lưu theo cơ chế "xoá sạch rồi ghi lại" (clear-all → insert-all). MiniSSO trước đây chỉ có
+// GroupAccess (nhóm ↔ đối tượng quyền) và suy ra module GIÁN TIẾP qua PermissionObject.Module —
+// KHÔNG có liên kết nhóm ↔ module trực tiếp. Bổ sung đúng bảng nối của iNOS.
+
+/// <summary>Gán module trực tiếp cho nhóm (tương ứng Sys_Access): nhóm được cấp 1 module.</summary>
+public class GroupModuleAccess
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid GroupId { get; set; }              // Sys_Access.GroupCode
+    public Guid ModuleId { get; set; }             // Sys_Access.ModuleCode
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 // ── Tổ chức theo cây (port từ iNOS.InBrand: Mst_Org) ──
 // iNOS lưu cây tổ chức dạng "materialized path": mỗi nút có OrgParent (cha) và 3 cột dẫn xuất
 // OrgBUCode (đường dẫn mã, vd "0.10.20"), OrgBUPattern (tiền tố để truy vấn cả nhánh, vd "0.10.20%"),
