@@ -24,6 +24,7 @@ builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AccountSecurityService>();
 builder.Services.AddScoped<RbacService>();
+builder.Services.AddScoped<GroupService>();
 builder.Services.AddScoped<OrgService>();
 builder.Services.AddScoped<DataScopeService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

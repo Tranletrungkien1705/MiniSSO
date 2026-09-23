@@ -27,7 +27,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<RefreshToken>().HasIndex(x => x.Token).IsUnique();
         b.Entity<AuthCode>().HasIndex(x => x.Code).IsUnique();
         b.Entity<AppLicense>().HasIndex(x => x.LicenseKey).IsUnique();
-        b.Entity<Group>(e => e.HasIndex(x => x.Code).IsUnique());
+        b.Entity<Group>(e => { e.HasIndex(x => x.Code).IsUnique(); e.HasIndex(x => x.OrgId); });
         b.Entity<GroupMember>(e => e.HasIndex(x => new { x.GroupId, x.UserId }).IsUnique());
         b.Entity<PermissionObject>(e => e.HasIndex(x => x.Code).IsUnique());
         b.Entity<GroupAccess>(e => e.HasIndex(x => new { x.GroupId, x.ObjectId }).IsUnique());

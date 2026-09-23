@@ -224,6 +224,33 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, Ac
         return Ok(new { userId = id, groups = await rbac.GroupCodesAsync(id), permissions = await rbac.EffectivePermissionsAsync(id) });
     }
 
+    // ── Gán thành viên/quyền theo nhóm — thay thế toàn bộ (port từ iNOS.InBrand) ──
+    // iNOS lưu thành viên/quyền của nhóm theo cơ chế "xoá sạch rồi ghi lại" (SysUserInGroupSave /
+    // SysAccessSave), kèm ràng buộc thành viên phải cùng đơn vị với nhóm (InvalidDLCode).
+    [HttpPut("groups/{id:guid}/members")]
+    public async Task<IActionResult> ReplaceGroupMembers(Guid id, [FromBody] GroupMembersReq r, GroupService groups)
+    {
+        var res = await groups.SetMembersAsync(id, r.UserIds ?? []);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
+        return Ok(new { ok = true, count = (r.UserIds ?? []).Distinct().Count() });
+    }
+
+    [HttpPut("groups/{id:guid}/access")]
+    public async Task<IActionResult> ReplaceGroupAccess(Guid id, [FromBody] GroupAccessSetReq r, GroupService groups)
+    {
+        var res = await groups.SetAccessAsync(id, r.ObjectCodes ?? []);
+        if (!res.Ok) return BadRequest(new { error = res.Error });
+        return Ok(new { ok = true, count = (r.ObjectCodes ?? []).Distinct().Count() });
+    }
+
+    // Xoá nhóm kèm dọn thành viên + cấp quyền (↔ SysGroupManager.Remove).
+    [HttpDelete("groups/{id:guid}")]
+    public async Task<IActionResult> DeleteGroup(Guid id, GroupService groups)
+    {
+        if (!await groups.DeleteGroupAsync(id)) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new { ok = true });
+    }
+
     // ── Cây tổ chức (port từ iNOS.InBrand: Mst_Org) ──
     [HttpGet("orgs")]
     public async Task<IActionResult> Orgs()
@@ -312,6 +339,8 @@ public class LicenseCheckReq { public string? LicenseKey { get; set; } public st
 public class GroupReq { public string Code { get; set; } = ""; public string? Name { get; set; } public string? Description { get; set; } }
 public class GroupAccessReq { public string ObjectCode { get; set; } = ""; public bool Grant { get; set; } = true; }
 public class GroupMemberReq { public Guid UserId { get; set; } public bool Add { get; set; } = true; }
+public class GroupMembersReq { public List<Guid>? UserIds { get; set; } }
+public class GroupAccessSetReq { public List<string>? ObjectCodes { get; set; } }
 public class OrgReq { public string Code { get; set; } = ""; public string? Name { get; set; } public Guid? ParentId { get; set; } public string? Remark { get; set; } }
 public class UserScopeReq { public bool IsSysAdmin { get; set; } public Guid? OrgId { get; set; } }
 public class ResetPasswordReq { public string NewPassword { get; set; } = ""; }

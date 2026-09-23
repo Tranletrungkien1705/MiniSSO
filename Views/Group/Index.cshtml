@@ -5,6 +5,8 @@
     var users = (List<AppUser>)ViewBag.Users;
     var members = (List<GroupMember>)ViewBag.Members;
     var access = (List<GroupAccess>)ViewBag.Access;
+    var orgs = (List<Org>)ViewBag.Orgs;
+    var orgById = orgs.ToDictionary(o => o.Id, o => o);
 }
 <div class="row g-3">
     <div class="col-lg-4"><div class="card"><div class="card-body">
@@ -12,10 +14,17 @@
         <form asp-action="Create" method="post">@Html.AntiForgeryToken()
             <div class="mb-2"><input name="code" class="form-control" placeholder="Mã nhóm * (vd SYSADMIN)" required /></div>
             <div class="mb-2"><input name="name" class="form-control" placeholder="Tên hiển thị" /></div>
-            <div class="mb-3"><input name="description" class="form-control" placeholder="Mô tả" /></div>
+            <div class="mb-2"><input name="description" class="form-control" placeholder="Mô tả" /></div>
+            <div class="mb-3">
+                <select name="orgId" class="form-select">
+                    <option value="">— Đơn vị (toàn cục) —</option>
+                    @foreach (var o in orgs) { <option value="@o.Id">@o.BuCode · @o.Name</option> }
+                </select>
+                <div class="form-text">Nhóm gắn đơn vị chỉ nhận thành viên cùng đơn vị (ràng buộc iNOS).</div>
+            </div>
             <button class="btn btn-primary w-100"><i class="bi bi-diagram-3 me-1"></i>Tạo nhóm</button>
         </form>
-        <p class="text-muted small mt-3 mb-0">Mô hình RBAC port từ iNOS.InBrand: Người dùng → Nhóm → Cấp quyền → Đối tượng quyền.</p>
+        <p class="text-muted small mt-3 mb-0">Mô hình RBAC port từ iNOS.InBrand: Người dùng → Nhóm → Cấp quyền → Đối tượng quyền. Lưu thành viên/quyền theo cơ chế thay-thế toàn bộ.</p>
     </div></div></div>
 
     <div class="col-lg-8">
@@ -23,14 +32,19 @@
         {
             var gMembers = members.Where(m => m.GroupId == g.Id).ToList();
             var gAccess = access.Where(a => a.GroupId == g.Id).Select(a => a.ObjectId).ToHashSet();
+            var gOrg = g.OrgId != null && orgById.TryGetValue(g.OrgId.Value, out var oo) ? oo : null;
             <div class="card mb-3"><div class="card-body">
                 <div class="d-flex align-items-center justify-content-between mb-2">
                     <div>
                         <span class="fw-bold">@g.Code</span>
                         <span class="text-muted ms-2">@g.Name</span>
                         @if (g.IsActive) { <span class="badge bg-success ms-2">bật</span> } else { <span class="badge bg-secondary ms-2">khóa</span> }
+                        @if (gOrg != null) { <span class="badge bg-info text-dark ms-2">@gOrg.BuCode · @gOrg.Name</span> } else { <span class="badge bg-light text-dark ms-2">toàn cục</span> }
                     </div>
-                    <form asp-action="Toggle" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@g.Id" /><button class="btn btn-sm btn-outline-secondary">@(g.IsActive ? "Khóa" : "Mở")</button></form>
+                    <div class="d-flex gap-1">
+                        <form asp-action="Toggle" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@g.Id" /><button class="btn btn-sm btn-outline-secondary">@(g.IsActive ? "Khóa" : "Mở")</button></form>
+                        <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Xoá nhóm @g.Code cùng toàn bộ thành viên & quyền?');">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@g.Id" /><button class="btn btn-sm btn-outline-danger">Xoá</button></form>
+                    </div>
                 </div>
                 @if (!string.IsNullOrWhiteSpace(g.Description)) { <p class="text-muted small mb-2">@g.Description</p> }
 
@@ -58,6 +72,38 @@
                                 <button class="btn btn-sm @(isMember ? "btn-outline-danger" : "btn-outline-primary")">@(isMember ? "Bớt" : "Thêm")</button>
                             </form>
                         }
+                    </div>
+                </div>
+
+                <hr class="my-3" />
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <form asp-action="SaveAccess" method="post">@Html.AntiForgeryToken()
+                            <input type="hidden" name="groupId" value="@g.Id" />
+                            <div class="small fw-semibold text-uppercase text-muted mb-1">Lưu quyền (thay thế toàn bộ)</div>
+                            @foreach (var o in objects)
+                            {
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="objectCodes" value="@o.Code" id="acc-@g.Id-@o.Id" @(gAccess.Contains(o.Id) ? "checked" : "") />
+                                    <label class="form-check-label small" for="acc-@g.Id-@o.Id"><code>@o.Code</code></label>
+                                </div>
+                            }
+                            <button class="btn btn-sm btn-primary mt-2">Lưu quyền</button>
+                        </form>
+                    </div>
+                    <div class="col-md-6">
+                        <form asp-action="SaveMembers" method="post">@Html.AntiForgeryToken()
+                            <input type="hidden" name="groupId" value="@g.Id" />
+                            <div class="small fw-semibold text-uppercase text-muted mb-1">Lưu thành viên (thay thế toàn bộ)</div>
+                            @foreach (var u in users)
+                            {
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="userIds" value="@u.Id" id="mem-@g.Id-@u.Id" @(gMembers.Any(m => m.UserId == u.Id) ? "checked" : "") />
+                                    <label class="form-check-label small" for="mem-@g.Id-@u.Id">@u.Email</label>
+                                </div>
+                            }
+                            <button class="btn btn-sm btn-primary mt-2">Lưu thành viên</button>
+                        </form>
                     </div>
                 </div>
             </div></div>

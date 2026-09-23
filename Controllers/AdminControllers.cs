@@ -62,7 +62,7 @@ public class UserController(AppDbContext db, AccountSecurityService security) : 
 }
 
 [Authorize]
-public class GroupController(AppDbContext db) : Controller
+public class GroupController(AppDbContext db, GroupService groups) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -70,16 +70,18 @@ public class GroupController(AppDbContext db) : Controller
         ViewBag.Users = await db.Users.OrderBy(u => u.Email).ToListAsync();
         ViewBag.Members = await db.GroupMembers.ToListAsync();
         ViewBag.Access = await db.GroupAccesses.ToListAsync();
+        ViewBag.Orgs = await db.Orgs.OrderBy(o => o.BuCode).ToListAsync();
         return View(await db.Groups.OrderBy(g => g.Code).ToListAsync());
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(string code, string? name, string? description)
+    public async Task<IActionResult> Create(string code, string? name, string? description, Guid? orgId)
     {
         if (string.IsNullOrWhiteSpace(code)) { TempData["Error"] = "Cần mã nhóm."; return RedirectToAction(nameof(Index)); }
         var c = code.Trim().ToUpperInvariant();
         if (await db.Groups.AnyAsync(g => g.Code == c)) { TempData["Error"] = "Mã nhóm đã tồn tại."; return RedirectToAction(nameof(Index)); }
-        db.Groups.Add(new Group { Code = c, Name = string.IsNullOrWhiteSpace(name) ? c : name!.Trim(), Description = description });
+        if (orgId != null && !await db.Orgs.AnyAsync(o => o.Id == orgId)) { TempData["Error"] = "Đơn vị không tồn tại."; return RedirectToAction(nameof(Index)); }
+        db.Groups.Add(new Group { Code = c, Name = string.IsNullOrWhiteSpace(name) ? c : name!.Trim(), Description = description, OrgId = orgId });
         await db.SaveChangesAsync();
         TempData["Success"] = "Đã tạo nhóm.";
         return RedirectToAction(nameof(Index));
@@ -112,6 +114,33 @@ public class GroupController(AppDbContext db) : Controller
         if (add && existing == null) db.GroupMembers.Add(new GroupMember { GroupId = groupId, UserId = userId });
         else if (!add && existing != null) db.GroupMembers.Remove(existing);
         await db.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Lưu toàn bộ thành viên nhóm theo cơ chế thay-thế (port từ iNOS SysUserInGroupSave).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveMembers(Guid groupId, Guid[]? userIds)
+    {
+        var res = await groups.SetMembersAsync(groupId, userIds ?? []);
+        if (!res.Ok) TempData["Error"] = res.Error; else TempData["Success"] = "Đã lưu thành viên nhóm.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Lưu toàn bộ quyền của nhóm theo cơ chế thay-thế (port từ iNOS SysAccessSave).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveAccess(Guid groupId, string[]? objectCodes)
+    {
+        var res = await groups.SetAccessAsync(groupId, objectCodes ?? []);
+        if (!res.Ok) TempData["Error"] = res.Error; else TempData["Success"] = "Đã lưu quyền nhóm.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Xoá nhóm kèm dọn thành viên + cấp quyền (port từ iNOS SysGroupManager.Remove).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        if (await groups.DeleteGroupAsync(id)) TempData["Success"] = "Đã xoá nhóm.";
+        else TempData["Error"] = "Không tìm thấy nhóm.";
         return RedirectToAction(nameof(Index));
     }
 }

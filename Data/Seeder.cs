@@ -23,6 +23,11 @@ public static class Seeder
                 "CREATE TABLE IF NOT EXISTS minisso.\"Groups\" (\"Id\" uuid PRIMARY KEY, \"Code\" text NOT NULL DEFAULT '', \"Name\" text NOT NULL DEFAULT '', \"Description\" text NULL, \"IsActive\" boolean NOT NULL DEFAULT true, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_Groups_Code\" ON minisso.\"Groups\" (\"Code\")");
+            // Đơn vị của nhóm (thêm sau) — EnsureCreated không thêm cột vào bảng đã tồn tại.
+            await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE minisso.\"Groups\" ADD COLUMN IF NOT EXISTS \"OrgId\" uuid NULL");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS \"IX_Groups_OrgId\" ON minisso.\"Groups\" (\"OrgId\")");
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE TABLE IF NOT EXISTS minisso.\"PermissionObjects\" (\"Id\" uuid PRIMARY KEY, \"Code\" text NOT NULL DEFAULT '', \"Name\" text NOT NULL DEFAULT '', \"Module\" text NULL, \"IsActive\" boolean NOT NULL DEFAULT true, \"CreatedAt\" timestamp NOT NULL DEFAULT now())");
             await db.Database.ExecuteSqlRawAsync(

@@ -125,6 +125,10 @@ public class Group
     public string Name { get; set; } = "";        // tên hiển thị (Sys_Group.GroupName)
     public string? Description { get; set; }
     public bool IsActive { get; set; } = true;    // Sys_Group.FlagActive
+    // ── Đơn vị của nhóm (port từ iNOS.InBrand SysGroup.DLCode) ──
+    // iNOS gắn mỗi nhóm vào 1 đại lý (DLCode); thành viên thêm vào nhóm phải cùng đơn vị với nhóm
+    // (Sys_UserInGroup_Save_InputTblDtl_InvalidDLCode). null = nhóm toàn cục (không ràng buộc đơn vị).
+    public Guid? OrgId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
