@@ -22,6 +22,7 @@ builder.Services.AddDbContext<AppDbContext>(o =>
 builder.Services.AddSingleton<SigningKeyStore>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<AccountSecurityService>();
 builder.Services.AddScoped<RbacService>();
 builder.Services.AddScoped<OrgService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

@@ -9,14 +9,13 @@ namespace MiniSSO.Services;
 public sealed record TokenResult(bool Ok, string? Error, string? AccessToken = null, string? IdToken = null,
     string? RefreshToken = null, int ExpiresIn = 0, string? Scope = null);
 
-public sealed class AuthService(AppDbContext db, TokenService tokens)
+public sealed class AuthService(AppDbContext db, TokenService tokens, AccountSecurityService security)
 {
     public async Task<AppUser?> ValidateUserAsync(string email, string password)
     {
-        // Chuẩn hóa email: bỏ khoảng trắng 2 đầu + không phân biệt hoa/thường (tránh lỗi copy-paste).
-        var norm = (email ?? "").Trim().ToLowerInvariant();
-        var u = await db.Users.FirstOrDefaultAsync(x => x.Email.ToLower() == norm && x.IsActive);
-        return u != null && PasswordHasher.Verify(password, u.PasswordHash) ? u : null;
+        // Xác thực qua chính sách bảo mật tài khoản (đếm sai, khoá tạm thời, nhật ký đăng nhập).
+        var outcome = await security.AuthenticateAsync(email, password);
+        return outcome.Ok ? outcome.User : null;
     }
 
     public Task<Client?> GetClientAsync(string clientId) =>

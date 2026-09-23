@@ -13,7 +13,7 @@ namespace MiniSSO.Controllers;
 [ApiController]
 [Route("api/v1")]
 [Produces("application/json")]
-public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac) : ControllerBase
+public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac, AccountSecurityService security) : ControllerBase
 {
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard()
@@ -32,7 +32,8 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac) : 
 
     [HttpGet("users")]
     public async Task<IActionResult> Users()
-        => Ok((await db.Users.OrderBy(u => u.Email).ToListAsync()).Select(u => new { u.Id, u.Email, u.FullName, roles = u.RoleList, u.Tenant, u.IsActive, u.CreatedAt }));
+        => Ok((await db.Users.OrderBy(u => u.Email).ToListAsync()).Select(u => new { u.Id, u.Email, u.FullName, roles = u.RoleList, u.Tenant, u.IsActive, u.CreatedAt,
+            u.FailedLoginCount, u.IsLockedOut, u.LockoutDate, u.LockoutUntil, u.LastLoginAt }));
 
     [HttpPost("users")]
     public async Task<IActionResult> CreateUser([FromBody] UserReq r)
@@ -54,6 +55,37 @@ public class ApiV1Controller(AppDbContext db, ICache cache, RbacService rbac) : 
         u.IsActive = !u.IsActive; await db.SaveChangesAsync();
         return Ok(new { ok = true, isActive = u.IsActive });
     }
+
+    // ── Bảo mật tài khoản (port từ iNOS.InBrand SysUser: Lockout / LockoutDate / ResetPass) ──
+    // Khoá/mở khoá tài khoản thủ công (admin) — tương ứng SysUser.Lockout.
+    [HttpPost("users/{id:guid}/lock")]
+    public async Task<IActionResult> LockUser(Guid id)
+    {
+        if (!await security.LockAsync(id)) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new { ok = true, isLockedOut = true });
+    }
+
+    [HttpPost("users/{id:guid}/unlock")]
+    public async Task<IActionResult> UnlockUser(Guid id)
+    {
+        if (!await security.UnlockAsync(id)) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new { ok = true, isLockedOut = false });
+    }
+
+    // Đặt lại mật khẩu (admin) — tương ứng SysUser.ResetPass: băm mật khẩu mới + mở khoá.
+    [HttpPost("users/{id:guid}/reset-password")]
+    public async Task<IActionResult> ResetPassword(Guid id, [FromBody] ResetPasswordReq r)
+    {
+        if (string.IsNullOrWhiteSpace(r.NewPassword) || r.NewPassword.Length < 6)
+            return BadRequest(new { error = "Mật khẩu mới phải từ 6 ký tự." });
+        if (!await security.ResetPasswordAsync(id, r.NewPassword)) return NotFound(new { error = "Không tìm thấy." });
+        return Ok(new { ok = true });
+    }
+
+    // Nhật ký đăng nhập gần đây (thành công/thất bại) — phục vụ truy vết bảo mật.
+    [HttpGet("login-attempts")]
+    public async Task<IActionResult> LoginAttempts([FromQuery] int take = 100)
+        => Ok((await security.RecentAttemptsAsync(take)).Select(a => new { a.Email, a.UserId, a.Success, a.Reason, a.RemoteIp, a.AttemptedAt }));
 
     [HttpGet("clients")]
     public async Task<IActionResult> Clients()
@@ -243,3 +275,4 @@ public class GroupAccessReq { public string ObjectCode { get; set; } = ""; publi
 public class GroupMemberReq { public Guid UserId { get; set; } public bool Add { get; set; } = true; }
 public class OrgReq { public string Code { get; set; } = ""; public string? Name { get; set; } public Guid? ParentId { get; set; } public string? Remark { get; set; }
 }
+public class ResetPasswordReq { public string NewPassword { get; set; } = ""; }

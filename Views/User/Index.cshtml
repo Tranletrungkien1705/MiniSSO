@@ -16,7 +16,7 @@
         <p class="text-muted small mt-3 mb-0">Mật khẩu băm PBKDF2-SHA256 (100k vòng).</p>
     </div></div></div>
     <div class="col-lg-8"><div class="card"><div class="card-body">
-        <table class="table table-hover align-middle"><thead><tr><th>Email</th><th>Họ tên</th><th>Vai trò</th><th>Tổ chức</th><th>TT</th><th></th></tr></thead><tbody>
+        <table class="table table-hover align-middle"><thead><tr><th>Email</th><th>Họ tên</th><th>Vai trò</th><th>Tổ chức</th><th>TT</th><th>Bảo mật</th><th></th></tr></thead><tbody>
         @foreach (var u in Model)
         {
             <tr>
@@ -24,7 +24,23 @@
                 <td>@foreach (var r in u.RoleList) { <span class="badge bg-light text-dark me-1">@r</span> }</td>
                 <td class="small text-muted">@u.Tenant</td>
                 <td>@if (u.IsActive) { <span class="badge bg-success">bật</span> } else { <span class="badge bg-secondary">khóa</span> }</td>
-                <td><form asp-action="Toggle" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@u.Id" /><button class="btn btn-sm btn-outline-secondary">@(u.IsActive ? "Khóa" : "Mở")</button></form></td>
+                <td class="small">
+                    @if (u.IsLockedOut) { <span class="badge bg-danger">đang khoá</span> }
+                    else if (u.FailedLoginCount > 0) { <span class="badge bg-warning text-dark">sai @u.FailedLoginCount lần</span> }
+                    else { <span class="text-muted">—</span> }
+                </td>
+                <td class="text-nowrap">
+                    <form asp-action="Toggle" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@u.Id" /><button class="btn btn-sm btn-outline-secondary">@(u.IsActive ? "Khóa" : "Mở")</button></form>
+                    @if (u.IsLockedOut)
+                    {
+                        <form asp-action="Unlock" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@u.Id" /><button class="btn btn-sm btn-outline-success">Mở khoá</button></form>
+                    }
+                    else
+                    {
+                        <form asp-action="Lock" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@u.Id" /><button class="btn btn-sm btn-outline-danger">Khoá</button></form>
+                    }
+                    <form asp-action="ResetPassword" method="post" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@u.Id" /><input name="newPassword" type="text" class="form-control form-control-sm d-inline-block" style="width:120px" placeholder="Mật khẩu mới" /><button class="btn btn-sm btn-outline-primary">Đặt lại</button></form>
+                </td>
             </tr>
         }
         </tbody></table>

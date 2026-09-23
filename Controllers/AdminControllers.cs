@@ -8,7 +8,7 @@ using MiniSSO.Services;
 namespace MiniSSO.Controllers;
 
 [Authorize]
-public class UserController(AppDbContext db) : Controller
+public class UserController(AppDbContext db, AccountSecurityService security) : Controller
 {
     public async Task<IActionResult> Index() => View(await db.Users.OrderBy(u => u.Email).ToListAsync());
 
@@ -29,6 +29,34 @@ public class UserController(AppDbContext db) : Controller
     {
         var u = await db.Users.FirstOrDefaultAsync(x => x.Id == id);
         if (u != null) { u.IsActive = !u.IsActive; await db.SaveChangesAsync(); }
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Khoá/mở khoá tài khoản (port từ iNOS.InBrand SysUser.Lockout).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Lock(Guid id)
+    {
+        await security.LockAsync(id);
+        TempData["Success"] = "Đã khoá tài khoản.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Unlock(Guid id)
+    {
+        await security.UnlockAsync(id);
+        TempData["Success"] = "Đã mở khoá tài khoản.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Đặt lại mật khẩu (port từ iNOS.InBrand SysUser.ResetPass).
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetPassword(Guid id, string newPassword)
+    {
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 6)
+        { TempData["Error"] = "Mật khẩu mới phải từ 6 ký tự."; return RedirectToAction(nameof(Index)); }
+        await security.ResetPasswordAsync(id, newPassword);
+        TempData["Success"] = "Đã đặt lại mật khẩu.";
         return RedirectToAction(nameof(Index));
     }
 }

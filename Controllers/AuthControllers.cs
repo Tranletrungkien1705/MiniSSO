@@ -8,7 +8,7 @@ using MiniSSO.Services;
 
 namespace MiniSSO.Controllers;
 
-public class AccountController(AuthService auth) : Controller
+public class AccountController(AccountSecurityService security) : Controller
 {
     [HttpGet]
     public IActionResult Login(string? returnUrl = null) { ViewBag.ReturnUrl = returnUrl; return View(); }
@@ -16,8 +16,14 @@ public class AccountController(AuthService auth) : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(string email, string password, string? returnUrl = null)
     {
-        var user = await auth.ValidateUserAsync(email ?? "", password ?? "");
-        if (user == null) { ModelState.AddModelError("", "Email hoặc mật khẩu không đúng."); ViewBag.ReturnUrl = returnUrl; return View(); }
+        var outcome = await security.AuthenticateAsync(email ?? "", password ?? "", HttpContext.Connection.RemoteIpAddress?.ToString());
+        if (!outcome.Ok)
+        {
+            ModelState.AddModelError("", outcome.Reason ?? "Email hoặc mật khẩu không đúng.");
+            ViewBag.ReturnUrl = returnUrl;
+            return View();
+        }
+        var user = outcome.User!;
         var identity = new ClaimsIdentity(new[]
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),

@@ -12,6 +12,16 @@ public class AppUser
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // ── Bảo mật tài khoản (port từ iNOS.InBrand SysUser: Enable / Lockout / LockoutDate / VerificationCode) ──
+    // iNOS tách "Enable" (bị vô hiệu hoá) khỏi "Lockout" (bị khoá do đăng nhập sai nhiều lần).
+    // MiniSSO trước đây chỉ có IsActive; bổ sung đếm số lần đăng nhập sai + tự khoá tạm thời.
+    public int FailedLoginCount { get; set; }              // số lần đăng nhập sai liên tiếp
+    public bool IsLockedOut { get; set; }                  // SysUser.Lockout — đang bị khoá
+    public DateTime? LockoutDate { get; set; }             // SysUser.LockoutDate — thời điểm bị khoá
+    public DateTime? LockoutUntil { get; set; }            // hết hạn khoá tạm thời (null = khoá vĩnh viễn tới khi admin mở)
+    public string? VerificationCode { get; set; }          // SysUser.VerificationCode — mã xác thực (đặt lại mật khẩu)
+    public DateTime? LastLoginAt { get; set; }             // lần đăng nhập thành công gần nhất
+
     public string[] RoleList => string.IsNullOrWhiteSpace(Roles) ? [] : Roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }
 
@@ -160,4 +170,20 @@ public class Org
     public string? Remark { get; set; }
     public bool IsActive { get; set; } = true;       // Mst_Org.FlagActive
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+// ── Nhật ký đăng nhập (port từ iNOS.InBrand: Sys_User_Login + TLog) ──
+// iNOS ghi log mỗi lần đăng nhập (thành công/thất bại) để truy vết bảo mật.
+// MiniSSO bổ sung bảng này để lưu vết đăng nhập phục vụ điều tra + thống kê.
+
+/// <summary>Một lần thử đăng nhập (thành công hoặc thất bại) — phục vụ truy vết bảo mật.</summary>
+public class LoginAttempt
+{
+    public long Id { get; set; }
+    public string Email { get; set; } = "";        // email/định danh đã thử
+    public Guid? UserId { get; set; }               // null nếu không tìm thấy người dùng
+    public bool Success { get; set; }
+    public string? Reason { get; set; }             // lý do thất bại (sai mật khẩu / bị khoá / vô hiệu)
+    public string? RemoteIp { get; set; }
+    public DateTime AttemptedAt { get; set; } = DateTime.UtcNow;
 }
